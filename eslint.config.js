@@ -13,6 +13,7 @@ export default [
         ...globals.browser,
         L: 'readonly', // Leaflet, loaded from the CDN
         Transit: 'readonly', // set by transit.js
+        Groups: 'readonly', // set by groups.js
         module: 'readonly', // transit.js is UMD: guarded by typeof module
       },
     },
@@ -27,8 +28,15 @@ export default [
     },
   },
   {
-    // Node config and tooling files are ES modules.
-    files: ['eslint.config.js', 'stylelint.config.js', 'tools/**/*.mjs'],
+    // Node config, tooling, tests, and the API (Vercel functions) are ES modules.
+    files: [
+      'eslint.config.js',
+      'stylelint.config.js',
+      'tools/**/*.mjs',
+      'tests/**/*.mjs',
+      'api/**/*.js',
+      'server/**/*.js',
+    ],
     languageOptions: { sourceType: 'module', globals: globals.node },
   },
 ];

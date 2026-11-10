@@ -44,6 +44,8 @@ jobs:
         run: npm run lint:css
       - name: HTML validation (includes SRI check on CDN assets)
         run: npm run lint:html
+      - name: Tests (API against in-memory Postgres, browser helpers, transit search)
+        run: npm test
       - name: Ruff (Python build scripts)
         run: pip install "ruff==${RUFF_VERSION}" && ruff check scripts
 

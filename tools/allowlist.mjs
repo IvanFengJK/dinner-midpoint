@@ -6,6 +6,7 @@ export const PUBLISHED_FILES = [
   'index.html',
   'app.js',
   'transit.js',
+  'groups.js',
   'style.css',
   'fonts/atkinson-hyperlegible-next.woff2',
   'data/graph.json',

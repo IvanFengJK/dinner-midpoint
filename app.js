@@ -1,4 +1,4 @@
-const MAX_PEOPLE = 6;
+const MAX_PEOPLE = 10;
 const ONEMAP = 'https://www.onemap.gov.sg/api/common/elastic/search';
 const $ = (id) => document.getElementById(id);
 const esc = (s) =>
@@ -8,10 +8,29 @@ const esc = (s) =>
   );
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const map = L.map('map').setView([1.3521, 103.8198], 11);
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 18,
-  attribution: '&copy; OpenStreetMap contributors',
+// Small DOM builder. Text always goes in as text, never as HTML.
+function el(tag, props = {}, ...kids) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === 'className') node.className = v;
+    else node.setAttribute(k, v);
+  }
+  node.append(...kids);
+  return node;
+}
+
+// Singapore-only app, so use OneMap's own basemap and keep the view inside the island.
+const map = L.map('map', {
+  minZoom: 11,
+  maxBounds: [
+    [1.1, 103.55],
+    [1.55, 104.15],
+  ],
+}).setView([1.3521, 103.8198], 11);
+L.tileLayer('https://www.onemap.gov.sg/maps/tiles/Default/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution:
+    '<a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener">OneMap</a> &copy; contributors | <a href="https://www.sla.gov.sg/" target="_blank" rel="noopener">Singapore Land Authority</a>',
 }).addTo(map);
 const layer = L.layerGroup().addTo(map);
 
@@ -59,7 +78,7 @@ async function geocode(postal) {
   if (geoCache.has(postal)) return geoCache.get(postal);
   return limited(async () => {
     let hit, err;
-    for (let n = 0; n < 4; n++) {
+    for (let n = 0; n < 5; n++) {
       try {
         hit = await fetchOnce(postal);
         err = null;
@@ -93,11 +112,11 @@ function score(people) {
   const per = people.map((p) => {
     const wa = g.access(p.work.lat, p.work.lng),
       ha = g.access(p.home.lat, p.home.lng);
-    if (!wa.length || !ha.length) throw new Error('unreachable');
+    if (!wa.length || !ha.length) throw Object.assign(new Error('unreachable'), { who: p.name });
     const fwd = g.search(wa, false),
       rev = g.search(ha, true);
     const direct = Math.min(g.reach(fwd, ha), walkDirect(p.work, p.home));
-    if (!Number.isFinite(direct)) throw new Error('unreachable');
+    if (!Number.isFinite(direct)) throw Object.assign(new Error('unreachable'), { who: p.name });
     return { fwd, rev, direct };
   });
   const out = [];
@@ -141,7 +160,7 @@ function personRow(i) {
   return d;
 }
 function renumber() {
-  const rows = [...document.querySelectorAll('.person')];
+  const rows = [...document.querySelectorAll('#people .person')];
   rows.forEach((d, i) => {
     d.setAttribute('aria-label', `Person ${i + 1}`);
     d.querySelector('.badge').textContent = i + 1;
@@ -151,7 +170,7 @@ function renumber() {
   $('add').disabled = rows.length >= MAX_PEOPLE;
 }
 $('add').onclick = () => {
-  $('people').append(personRow(document.querySelectorAll('.person').length));
+  $('people').append(personRow(document.querySelectorAll('#people .person').length));
   renumber();
   $('people').lastElementChild.querySelector('input').focus();
 };
@@ -175,12 +194,12 @@ let picks = [];
 const gmaps = (s) =>
   `https://www.google.com/maps/search/${encodeURIComponent('restaurants near ' + s.name + (s.station ? '' : ' MRT'))}`;
 
-function resultPlate(r, i, maxDetour) {
+function resultPlate(r, i, maxDetour, people) {
   const bars = r.detours
     .map((d, j) => {
       const w = Math.max(3, Math.round((Math.max(d, 0) / maxDetour) * 100));
       return (
-        `<li><span class="who" aria-hidden="true">${j + 1}</span><span class="sr">Person ${j + 1}: </span>` +
+        `<li><span class="who" aria-hidden="true">${people[j].n}</span><span class="sr">${esc(people[j].name)}: </span>` +
         `<span class="bar" style="--w:${w}%"></span><span class="min">+${Math.round(d)} min</span></li>`
       );
     })
@@ -209,128 +228,567 @@ $('results').addEventListener('click', (e) => {
 });
 
 function setStatus(text, isError = false) {
-  const el = $('status');
-  el.textContent = text;
-  el.classList.toggle('err', isError);
+  const node = $('status');
+  node.textContent = text;
+  node.classList.toggle('err', isError);
 }
 
+// ---------- Results (shared by the quick calculator and groups) ----------
+// people: [{ n: number shown on the pins, name, work: {lat, lng}, home: {lat, lng} }]
+let lastPeople = null;
+
+function clearResults() {
+  $('out').hidden = true;
+  layer.clearLayers();
+  picks = [];
+  lastPeople = null;
+}
+
+function renderResults(people, { scroll = false } = {}) {
+  lastPeople = people;
+  const ranked = score(people);
+  const top = ranked.slice(0, 5);
+  layer.clearLayers();
+  picks = [];
+
+  // Each person's straight work-to-home line: the baseline the detours are measured against.
+  people.forEach((p) =>
+    L.polyline(
+      [
+        [p.work.lat, p.work.lng],
+        [p.home.lat, p.home.lng],
+      ],
+      { className: 'trip-line', weight: 2, dashArray: '4 6', opacity: 0.8, interactive: false },
+    ).addTo(layer),
+  );
+
+  // Other places first so the top five draw above them.
+  const lo = ranked[0].worst,
+    hi = ranked[Math.min(ranked.length - 1, 60)].worst;
+  ranked.slice(5).forEach((r) => {
+    const t = Math.min(1, (r.worst - lo) / (hi - lo || 1));
+    L.circleMarker([r.s.lat, r.s.lng], {
+      className: 'dot-other',
+      radius: 6,
+      fillColor: color(t),
+      fillOpacity: 0.95,
+    })
+      .bindTooltip(`${esc(r.s.name)}: worst detour +${Math.round(r.worst)} min`)
+      .addTo(layer);
+  });
+  top.forEach((r, i) => {
+    picks.push(
+      L.marker([r.s.lat, r.s.lng], {
+        icon: pin(`pin-pick${i === 0 ? ' first' : ''}`, i + 1, 32),
+        title: r.s.name,
+        zIndexOffset: 1000 - i,
+      })
+        .bindTooltip(`${esc(r.s.name)}: worst detour +${Math.round(r.worst)} min`)
+        .addTo(layer),
+    );
+  });
+  people.forEach((p) => {
+    L.marker([p.work.lat, p.work.lng], {
+      icon: pin('pin-work', p.n, 24),
+      title: `${p.name} work`,
+    })
+      .bindTooltip(`${esc(p.name)}: work`)
+      .addTo(layer);
+    L.marker([p.home.lat, p.home.lng], {
+      icon: pin('pin-home', p.n, 24),
+      title: `${p.name} home`,
+    })
+      .bindTooltip(`${esc(p.name)}: home`)
+      .addTo(layer);
+  });
+
+  const maxDetour = Math.max(...top.flatMap((r) => r.detours), 1);
+  $('results').innerHTML = top.map((r, i) => resultPlate(r, i, maxDetour, people)).join('');
+  $('out').hidden = false;
+
+  const bounds = [
+    ...top.map((r) => [r.s.lat, r.s.lng]),
+    ...people.flatMap((p) => [
+      [p.work.lat, p.work.lng],
+      [p.home.lat, p.home.lng],
+    ]),
+  ];
+  map.fitBounds(L.latLngBounds(bounds).pad(0.15), { maxZoom: 15, animate: !reduceMotion() });
+  setStatus(
+    `Showing the ${top.length} fairest of ${ranked.length} ${mode() === 'malls' ? 'malls' : 'MRT stations'}.`,
+  );
+  if (scroll)
+    $('out').scrollIntoView({ block: 'start', behavior: reduceMotion() ? 'auto' : 'smooth' });
+}
+
+async function showResults(people, opts) {
+  try {
+    await graphReady;
+    renderResults(people, opts);
+  } catch (err) {
+    clearResults();
+    if (err.message === 'unreachable') {
+      setStatus(
+        err.who
+          ? `We couldn't find public transport near ${err.who}'s address. Try a different postal code.`
+          : "We couldn't find public transport near one of those addresses. Try a different postal code.",
+        true,
+      );
+    } else if (!graph) {
+      setStatus('The transit data failed to load. Reload the page and try again.', true);
+    } else {
+      throw err;
+    }
+  }
+}
+
+// Switching Malls / MRT stations re-ranks instantly, with no new lookups.
+document.querySelectorAll('input[name=mode]').forEach((r) =>
+  r.addEventListener('change', () => {
+    if (lastPeople) showResults(lastPeople);
+  }),
+);
+
+// ---------- Forms ----------
+const markBad = (inp) => {
+  inp.classList.add('bad');
+  inp.setAttribute('aria-invalid', 'true');
+};
+const clearBad = (inp) => {
+  inp.classList.remove('bad');
+  inp.removeAttribute('aria-invalid');
+};
+
+// Looks up one person's two postal codes once. The coordinates are saved with the entry,
+// so viewing a group never calls OneMap.
+async function lookupEntry({ name, work, home }) {
+  [work, home].forEach(clearBad);
+  const pts = await Promise.all(
+    [work, home].map(async (inp) => {
+      try {
+        return await geocode(inp.value.trim());
+      } catch (err) {
+        if (err.message === 'not found') markBad(inp);
+        throw err;
+      }
+    }),
+  );
+  const place = (inp, pt) => ({ postal: inp.value.trim(), lat: pt.lat, lng: pt.lng });
+  return { name: name.value.trim(), work: place(work, pts[0]), home: place(home, pts[1]) };
+}
+
+// Turns any error into a short message, and outlines the field the server complained about.
+function explain(err, inputs = {}) {
+  if (err.message === 'not found') {
+    document.querySelector('input.bad')?.focus();
+    return "We couldn't find a postal code. Check the boxes outlined in red.";
+  }
+  if (err.field && inputs[err.field]) {
+    markBad(inputs[err.field]);
+    inputs[err.field].focus();
+    return err.message;
+  }
+  if (err.status === 0) return "Couldn't reach the server. Check your connection and try again.";
+  if (err.status) return err.message;
+  return 'OneMap is busy right now. Please try again in a few seconds.';
+}
+
+const lookupInputs = (prefix) => ({
+  name: $(`${prefix}-name`),
+  work: $(`${prefix}-work`),
+  home: $(`${prefix}-home`),
+});
+
+// Quick calculator: type everyone in yourself. Nothing is saved.
 $('form').onsubmit = async (e) => {
   e.preventDefault();
   const go = $('go');
   go.disabled = true;
   go.textContent = 'Finding…';
   setStatus('Looking up addresses…');
-  const rows = [...document.querySelectorAll('.person')];
+  const rows = [...document.querySelectorAll('#people .person')];
   const inputs = rows.flatMap((r) => [...r.querySelectorAll('input')]);
-  inputs.forEach((i) => {
-    i.classList.remove('bad');
-    i.removeAttribute('aria-invalid');
-  });
+  inputs.forEach(clearBad);
   try {
     const pts = await Promise.all(
       inputs.map(async (inp) => {
         try {
           return await geocode(inp.value.trim());
         } catch (err) {
-          if (err.message === 'not found') {
-            inp.classList.add('bad');
-            inp.setAttribute('aria-invalid', 'true');
-          }
+          if (err.message === 'not found') markBad(inp);
           throw err;
         }
       }),
     );
-    const people = rows.map((_, i) => ({ work: pts[i * 2], home: pts[i * 2 + 1] }));
+    const people = rows.map((_, i) => ({
+      n: i + 1,
+      name: `Person ${i + 1}`,
+      work: pts[i * 2],
+      home: pts[i * 2 + 1],
+    }));
     setStatus('Working out routes…');
-    await graphReady;
-    const ranked = score(people);
-    const top = ranked.slice(0, 5);
-    layer.clearLayers();
-    picks = [];
-
-    // Each person's straight work-to-home line: the baseline the detours are measured against.
-    people.forEach((p) =>
-      L.polyline(
-        [
-          [p.work.lat, p.work.lng],
-          [p.home.lat, p.home.lng],
-        ],
-        { className: 'trip-line', weight: 2, dashArray: '4 6', opacity: 0.8, interactive: false },
-      ).addTo(layer),
-    );
-
-    // Other places first so the top five draw above them.
-    const lo = ranked[0].worst,
-      hi = ranked[Math.min(ranked.length - 1, 60)].worst;
-    ranked.slice(5).forEach((r) => {
-      const t = Math.min(1, (r.worst - lo) / (hi - lo || 1));
-      L.circleMarker([r.s.lat, r.s.lng], {
-        className: 'dot-other',
-        radius: 6,
-        fillColor: color(t),
-        fillOpacity: 0.95,
-      })
-        .bindTooltip(`${esc(r.s.name)}: worst detour +${Math.round(r.worst)} min`)
-        .addTo(layer);
-    });
-    top.forEach((r, i) => {
-      picks.push(
-        L.marker([r.s.lat, r.s.lng], {
-          icon: pin(`pin-pick${i === 0 ? ' first' : ''}`, i + 1, 32),
-          title: r.s.name,
-          zIndexOffset: 1000 - i,
-        })
-          .bindTooltip(`${esc(r.s.name)}: worst detour +${Math.round(r.worst)} min`)
-          .addTo(layer),
-      );
-    });
-    people.forEach((p, i) => {
-      L.marker([p.work.lat, p.work.lng], {
-        icon: pin('pin-work', i + 1, 24),
-        title: `Person ${i + 1} work`,
-      })
-        .bindTooltip(`Person ${i + 1}: work`)
-        .addTo(layer);
-      L.marker([p.home.lat, p.home.lng], {
-        icon: pin('pin-home', i + 1, 24),
-        title: `Person ${i + 1} home`,
-      })
-        .bindTooltip(`Person ${i + 1}: home`)
-        .addTo(layer);
-    });
-
-    const maxDetour = Math.max(...top.flatMap((r) => r.detours), 1);
-    $('results').innerHTML = top.map((r, i) => resultPlate(r, i, maxDetour)).join('');
-    $('out').hidden = false;
-
-    const pts2 = [
-      ...top.map((r) => [r.s.lat, r.s.lng]),
-      ...people.flatMap((p) => [
-        [p.work.lat, p.work.lng],
-        [p.home.lat, p.home.lng],
-      ]),
-    ];
-    map.fitBounds(L.latLngBounds(pts2).pad(0.15), { maxZoom: 15, animate: !reduceMotion() });
-    setStatus(
-      `Showing the ${top.length} fairest of ${ranked.length} ${mode() === 'malls' ? 'malls' : 'MRT stations'}.`,
-    );
-    $('out').scrollIntoView({ block: 'start', behavior: reduceMotion() ? 'auto' : 'smooth' });
+    await showResults(people, { scroll: true });
   } catch (err) {
-    if (err.message === 'not found') {
-      setStatus("We couldn't find a postal code. Check the boxes outlined in red.", true);
-      document.querySelector('input.bad')?.focus();
-    } else if (err.message === 'unreachable') {
-      setStatus(
-        "We couldn't find public transport near one of those addresses. Try a different postal code.",
-        true,
-      );
-    } else if (!graph) {
-      setStatus('The transit data failed to load. Reload the page and try again.', true);
-    } else {
-      setStatus('OneMap is busy right now. Please try again in a few seconds.', true);
-    }
+    setStatus(explain(err), true);
   } finally {
     go.disabled = false;
     go.textContent = 'Find where to eat';
   }
 };
+
+// ---------- Views ----------
+const state = { id: null, data: null, editing: null, sig: '', timer: null };
+const VIEWS = ['home', 'quick', 'group'];
+function showView(name) {
+  for (const v of VIEWS) $(`view-${v}`).hidden = v !== name;
+}
+
+$('quick-open').onclick = () => {
+  showView('quick');
+  setStatus('');
+  document.querySelector('#people input')?.focus();
+};
+$('quick-close').onclick = () => {
+  showView('home');
+  clearResults();
+  setStatus('');
+};
+
+const fmtDate = (iso) =>
+  new Date(iso).toLocaleDateString('en-SG', { day: 'numeric', month: 'short' });
+
+function stopPolling() {
+  clearInterval(state.timer);
+  state.timer = null;
+}
+function startPolling() {
+  if (state.timer) return;
+  state.timer = setInterval(() => {
+    if (document.visibilityState === 'visible') loadGroup();
+  }, 30000);
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && state.id) loadGroup();
+});
+
+function route() {
+  const parsed = Groups.parseHash(location.hash);
+  stopPolling();
+  clearResults();
+  state.editing = null;
+  state.sig = '';
+  if (!parsed) {
+    state.id = null;
+    state.data = null;
+    showView('home');
+    return;
+  }
+  // Keys arrive in the link. Keep them in this browser, then take them out of the address bar.
+  if (parsed.memberKey)
+    Groups.save(parsed.id, { memberId: parsed.memberId, memberKey: parsed.memberKey });
+  if (parsed.ownerKey) Groups.save(parsed.id, { ownerKey: parsed.ownerKey });
+  if (parsed.memberKey || parsed.ownerKey) {
+    history.replaceState(null, '', `${location.pathname}${location.search}#g=${parsed.id}`);
+  }
+  state.id = parsed.id;
+  state.data = null;
+  showView('group');
+  $('group-h').textContent = 'Loading group…';
+  $('group-meta').textContent = '';
+  $('members').replaceChildren();
+  $('entry-form').hidden = true;
+  $('join-open').hidden = true;
+  $('owner-tools').hidden = true;
+  setStatus('');
+  loadGroup(true);
+}
+window.addEventListener('hashchange', route);
+
+function groupExpired() {
+  const id = state.id;
+  stopPolling();
+  Groups.forget(id);
+  state.id = null;
+  history.replaceState(null, '', location.pathname + location.search);
+  clearResults();
+  showView('home');
+  setStatus('That group has expired or no longer exists. You can start a new one.', true);
+}
+
+async function loadGroup(initial = false) {
+  const id = state.id;
+  if (!id) return;
+  try {
+    const data = await Groups.request('GET', `/${id}`);
+    if (id !== state.id) return;
+    renderGroup(data, initial);
+    startPolling();
+  } catch (err) {
+    if (id !== state.id) return;
+    if (err.status === 404) return groupExpired();
+    setStatus(
+      initial
+        ? "We couldn't load this group. Check your connection and reload."
+        : "Couldn't refresh just now. We'll try again shortly.",
+      true,
+    );
+  }
+}
+
+// ---------- Group screen ----------
+function renderGroup(data, initial) {
+  const creds = Groups.creds(data.id);
+  const me = creds.memberId ? data.members.find((m) => m.id === creds.memberId) : null;
+  const owner = Boolean(creds.ownerKey);
+  state.data = data;
+
+  $('group-h').textContent = data.name;
+  $('group-meta').textContent =
+    `${data.members.length} of ${data.maxMembers} people. Deleted on ${fmtDate(data.expiresAt)} unless someone changes it.`;
+
+  const list = $('members');
+  list.replaceChildren(
+    ...data.members.map((m) => {
+      const mine = me && m.id === me.id;
+      const acts = el('div', { className: 'acts' });
+      if (mine) {
+        const edit = el(
+          'button',
+          { type: 'button', className: 'act', 'aria-label': `Edit ${m.name}` },
+          'Edit',
+        );
+        edit.onclick = () => startEntry(m);
+        acts.append(edit);
+      }
+      if (mine || owner) {
+        const rm = el(
+          'button',
+          { type: 'button', className: 'act', 'aria-label': `Remove ${m.name}` },
+          'Remove',
+        );
+        rm.onclick = () => removeEntry(m, mine);
+        acts.append(rm);
+      }
+      const nameLine = el('p', { className: 'who-line' }, el('strong', {}, m.name));
+      if (mine) nameLine.append(el('span', { className: 'tag' }, 'You'));
+      return el(
+        'li',
+        { className: 'member' },
+        el('span', { className: 'badge', 'aria-hidden': 'true' }, String(m.slot)),
+        el(
+          'div',
+          { className: 'info' },
+          nameLine,
+          el('p', { className: 'places' }, `Work ${m.work.postal} · Home ${m.home.postal}`),
+        ),
+        acts,
+      );
+    }),
+  );
+
+  const full = data.members.length >= data.maxMembers;
+  $('join-open').hidden = Boolean(me) || full || state.editing !== null;
+  if (!me && full && !state.editing) setStatus(`This group is full (${data.maxMembers} people).`);
+  $('owner-tools').hidden = !owner;
+  renderLinks(data.id, creds);
+  if (initial && state.justCreated) {
+    state.justCreated = false;
+    $('links').open = true;
+    setStatus(
+      'Group created. Share the group link, and save your personal link to edit from another device.',
+    );
+  }
+
+  // Only redo the ranking and the map when the people actually changed.
+  const sig = JSON.stringify([data.members, mode()]);
+  const waiting = data.members.length < 2;
+  $('group-wait').hidden = !waiting;
+  if (waiting) {
+    clearResults();
+    state.sig = '';
+  } else if (sig !== state.sig) {
+    state.sig = sig;
+    showResults(
+      data.members.map((m) => ({ n: m.slot, name: m.name, work: m.work, home: m.home })),
+      { scroll: initial },
+    );
+  }
+}
+
+function renderLinks(id, creds) {
+  const base = `${location.origin}${location.pathname}`;
+  const urls = Groups.links(base, id, creds);
+  const row = (label, url, note) => {
+    const input = el('input', {
+      type: 'text',
+      className: 'txt',
+      readonly: '',
+      value: url,
+      'aria-label': label,
+    });
+    input.onfocus = () => input.select();
+    const copy = el('button', { type: 'button', className: 'act' }, 'Copy');
+    copy.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(url);
+        copy.textContent = 'Copied';
+        setTimeout(() => (copy.textContent = 'Copy'), 1500);
+      } catch {
+        input.focus();
+      }
+    };
+    return el(
+      'div',
+      { className: 'linkrow' },
+      el('span', { className: 'k' }, label),
+      el('p', { className: 'note' }, note),
+      el('div', { className: 'copy' }, input, copy),
+    );
+  };
+  const rows = [
+    row(
+      'Group link',
+      urls.group,
+      'Send this to the people joining. Anyone with it can see the group.',
+    ),
+  ];
+  if (urls.personal)
+    rows.push(
+      row(
+        'Your personal link',
+        urls.personal,
+        'Keep this private. It lets you edit or remove your entry from any device.',
+      ),
+    );
+  if (urls.owner)
+    rows.push(
+      row(
+        'Owner link',
+        urls.owner,
+        'Keep this private. It lets you remove entries and delete the group.',
+      ),
+    );
+  $('links-body').replaceChildren(...rows);
+}
+
+// ---------- Create, join, edit, remove ----------
+$('create-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const go = $('create-go');
+  const groupName = $('create-group');
+  const inputs = { groupName, ...lookupInputs('create') };
+  go.disabled = true;
+  go.textContent = 'Starting…';
+  setStatus('Looking up addresses…');
+  try {
+    const entry = await lookupEntry(lookupInputs('create'));
+    const made = await Groups.request('POST', '', {
+      body: { groupName: groupName.value.trim(), ...entry },
+    });
+    Groups.save(made.groupId, {
+      memberId: made.memberId,
+      memberKey: made.memberKey,
+      ownerKey: made.ownerKey,
+    });
+    state.justCreated = true;
+    $('create-form').reset();
+    location.hash = `#g=${made.groupId}`;
+  } catch (err) {
+    setStatus(explain(err, inputs), true);
+  } finally {
+    go.disabled = false;
+    go.textContent = 'Start group';
+  }
+};
+
+function startEntry(member = null) {
+  state.editing = member ? member.id : 'new';
+  const f = lookupInputs('entry');
+  Object.values(f).forEach(clearBad);
+  f.name.value = member ? member.name : '';
+  f.work.value = member ? member.work.postal : '';
+  f.home.value = member ? member.home.postal : '';
+  $('entry-h').textContent = member ? 'Edit your details' : 'Add your details';
+  $('entry-form').hidden = false;
+  $('join-open').hidden = true;
+  setStatus('');
+  f.name.focus();
+}
+function stopEntry() {
+  state.editing = null;
+  $('entry-form').hidden = true;
+  if (state.data) renderGroup(state.data, false);
+}
+$('join-open').onclick = () => startEntry();
+$('entry-cancel').onclick = stopEntry;
+
+$('entry-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const go = $('entry-go');
+  const id = state.id;
+  const inputs = lookupInputs('entry');
+  go.disabled = true;
+  go.textContent = 'Saving…';
+  setStatus('Looking up addresses…');
+  try {
+    const entry = await lookupEntry(inputs);
+    if (state.editing === 'new') {
+      const added = await Groups.request('POST', `/${id}/members`, { body: entry });
+      Groups.save(id, { memberId: added.memberId, memberKey: added.memberKey });
+    } else {
+      const { memberKey } = Groups.creds(id);
+      await Groups.request('PUT', `/${id}/members/${state.editing}`, {
+        body: entry,
+        key: memberKey,
+      });
+    }
+    state.editing = null;
+    $('entry-form').hidden = true;
+    setStatus('Saved.');
+    await loadGroup();
+  } catch (err) {
+    if (err.status === 404) return groupExpired();
+    setStatus(explain(err, inputs), true);
+  } finally {
+    go.disabled = false;
+    go.textContent = 'Save';
+  }
+};
+
+async function removeEntry(member, mine) {
+  const id = state.id;
+  const who = mine ? 'your entry' : `${member.name}'s entry`;
+  if (!confirm(`Remove ${who} from this group?`)) return;
+  const creds = Groups.creds(id);
+  try {
+    await Groups.request('DELETE', `/${id}/members/${member.id}`, {
+      key: mine ? creds.memberKey : creds.ownerKey,
+    });
+    if (mine) Groups.forget(id, 'memberId', 'memberKey');
+    setStatus('Removed.');
+    await loadGroup();
+  } catch (err) {
+    if (err.status === 404) return groupExpired();
+    setStatus(explain(err), true);
+  }
+}
+
+$('delete-group').onclick = async () => {
+  const id = state.id;
+  if (!confirm('Delete this group for everyone? This cannot be undone.')) return;
+  try {
+    await Groups.request('DELETE', `/${id}`, { key: Groups.creds(id).ownerKey });
+    stopPolling();
+    Groups.forget(id);
+    state.id = null;
+    clearResults();
+    history.replaceState(null, '', location.pathname + location.search);
+    showView('home');
+    setStatus('Group deleted.');
+  } catch (err) {
+    if (err.status === 404) return groupExpired();
+    setStatus(explain(err), true);
+  }
+};
+
+route();

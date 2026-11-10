@@ -54,6 +54,11 @@
   box-sizing: border-box;
 }
 
+/* Author display rules (grid, flex) must never un-hide an element marked hidden. */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   height: 100%;
@@ -245,7 +250,8 @@ button {
   border-style: solid;
 }
 
-#go {
+#go,
+.primary {
   display: block;
   width: 100%;
   min-height: 50px;
@@ -258,12 +264,14 @@ button {
   border-radius: 8px;
 }
 
-#go:disabled {
+#go:disabled,
+.primary:disabled {
   opacity: 0.65;
   cursor: progress;
 }
 
-#go:hover:not(:disabled) {
+#go:hover:not(:disabled),
+.primary:hover:not(:disabled) {
   filter: brightness(1.08);
 }
 
@@ -603,6 +611,154 @@ h3 {
   color: var(--ink);
   background: var(--plate);
   border-color: var(--line);
+}
+
+/* Groups */
+.entry {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0 16px;
+  padding: 14px;
+  background: var(--plate);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.tight {
+  margin-top: 4px;
+}
+
+.entry .priv {
+  margin: 0;
+}
+
+input[type='text'].txt {
+  letter-spacing: normal;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.flat {
+  flex: 1;
+  margin-top: 0;
+}
+
+.act {
+  padding: 8px 6px;
+  min-height: 44px;
+  font: 600 14px var(--font);
+  color: var(--ink);
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.act:hover {
+  color: var(--blue);
+}
+
+.danger {
+  color: var(--bad);
+}
+
+.linkish {
+  display: block;
+  margin: 8px 0 0;
+  padding: 10px 0;
+  min-height: 44px;
+  font: 600 14px var(--font);
+  color: var(--blue);
+  background: none;
+  border: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.members {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.member {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.member .badge {
+  height: 32px;
+}
+
+.who-line,
+.places {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.places {
+  font-size: 14px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tag {
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--on-blue);
+  background: var(--blue);
+  border-radius: 99px;
+}
+
+.acts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.wait {
+  margin: 8px 0;
+  padding: 12px;
+  color: var(--muted);
+  background: var(--plate);
+  border: 1px dashed var(--field);
+  border-radius: 8px;
+}
+
+#links-body {
+  display: grid;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.linkrow .note {
+  margin: 0 0 6px;
+}
+
+.copy {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+#owner-tools {
+  margin-top: 8px;
+}
+
+#out .seg {
+  margin: 8px 0 14px;
 }
 
 @media (max-width: 760px) {

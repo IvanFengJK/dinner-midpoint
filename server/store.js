@@ -53,29 +53,39 @@ export async function createGroup(db, { groupName, member }) {
   return { groupId, ownerKey, memberId, memberKey };
 }
 
-export async function getGroup(db, groupId) {
+// Other people's homes are shown on a 0.005-degree grid (about 550 m): Math.round(v * 200) / 200.
+const blur = (v) => Math.round(v * 200) / 200;
+
+export async function getGroup(db, groupId, memberKey = null) {
   const groups = await db.query(
     `SELECT id, name, expires_at FROM groups WHERE id = $1::text AND ${LIVE()}`,
     [groupId],
   );
   if (!groups.length) throw NOT_FOUND();
   const members = await db.query(
-    `SELECT id, slot, name, work_postal, work_lat, work_lng, home_postal, home_lat, home_lng
+    `SELECT id, slot, name, work_postal, work_lat, work_lng, home_postal, home_lat, home_lng, key_hash
      FROM members WHERE group_id = $1::text ORDER BY slot`,
     [groupId],
   );
+  const mineHash = memberKey ? hashKey(memberKey) : null;
   return {
     id: groups[0].id,
     name: groups[0].name,
     expiresAt: new Date(groups[0].expires_at).toISOString(),
     maxMembers: MAX_MEMBERS,
-    members: members.map((m) => ({
-      id: m.id,
-      slot: Number(m.slot),
-      name: m.name,
-      work: { postal: m.work_postal, lat: Number(m.work_lat), lng: Number(m.work_lng) },
-      home: { postal: m.home_postal, lat: Number(m.home_lat), lng: Number(m.home_lng) },
-    })),
+    members: members.map((m) => {
+      const mine = mineHash !== null && m.key_hash === mineHash;
+      const lat = Number(m.home_lat);
+      const lng = Number(m.home_lng);
+      return {
+        id: m.id,
+        slot: Number(m.slot),
+        name: m.name,
+        ...(mine && { mine: true }),
+        work: { postal: m.work_postal, lat: Number(m.work_lat), lng: Number(m.work_lng) },
+        home: mine ? { postal: m.home_postal, lat, lng } : { lat: blur(lat), lng: blur(lng) },
+      };
+    }),
   };
 }
 

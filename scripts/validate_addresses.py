@@ -1,4 +1,5 @@
-"""Held-out check: random bus stop -> random mall (ordinary points, not stations). OneMap vs graph vs fitted formula."""
+"""Held-out check: random bus stop -> random mall (ordinary points, not stations). OneMap vs graph vs fitted formula.
+Writes data/holdout-busstop-mall.json."""
 
 import json, random, sys, time, urllib.request, urllib.error
 
@@ -55,7 +56,7 @@ for a, m, d in pairs:
             "fit": round(18.1 + 2.03 * d, 1),
         }
     )
-json.dump(rows, open("data/calibration2.json", "w"), indent=1)
+json.dump(rows, open("data/holdout-busstop-mall.json", "w"), indent=1)
 ok = [r for r in rows if r["actual"] and r["graph"]]
 for r in sorted(ok, key=lambda r: r["km"]):
     print(

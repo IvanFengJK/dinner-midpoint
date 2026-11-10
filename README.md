@@ -53,10 +53,16 @@ for other people use the blurred position, so results can shift slightly.
 npm ci
 npm run dev      # http://localhost:8765, with an in-memory database (lost on restart)
 npm test         # API tests run the real SQL against in-memory Postgres
+npx playwright install chromium   # once, for the browser tests
+npm run e2e      # browser tests: the real page and API on port 8804, no network needed
 npm run lint && npm run format:check
 ```
 
-Locally the postal-code lookup still calls OneMap, so you need a network connection. OneMap
+`npm run e2e` starts its own dev server (`PORT`, default 8804) and answers OneMap's search and map
+tiles, and Leaflet's CDN files, from fixtures, so it never touches the network. It cannot catch quirks
+of real devices.
+
+When you run `npm run dev` yourself, the postal-code lookup still calls OneMap, so you need a network connection. OneMap
 rate-limits bursts. The page retries with a short back-off, and says so if it gives up.
 
 ## Deploy on Vercel
@@ -99,6 +105,7 @@ Expired groups are never shown, even before the nightly clean-up removes them.
 | `api/`                                                                                     | Vercel Function entry points (thin wrappers)                    |
 | `server/`                                                                                  | routing, validation, SQL, rate limiting                         |
 | `tests/`                                                                                   | `npm test`                                                      |
+| `e2e/`, `playwright.config.mjs`                                                            | `npm run e2e` (Chromium; OneMap and the CDN are stubbed)        |
 | `tools/`                                                                                   | build, site check, local dev server                             |
 | `scripts/`, `data/*.json`                                                                  | Python scripts and inputs that rebuild the graph (not deployed) |
 

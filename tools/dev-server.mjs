@@ -19,6 +19,11 @@ const siteHeaders = Object.fromEntries(
 
 // The limiter only trusts the address Vercel's edge sets. Locally this server plays that edge.
 process.env.VERCEL ||= '1';
+// The browser tests (playwright.config.mjs) set this so each browser context can act as its own
+// visitor via X-Forwarded-For. Never set it anywhere else: it lets clients pick their address.
+const trustForwardedFor = process.env.DEV_TRUST_FORWARDED_FOR === '1';
+const visitor = (req) =>
+  (trustForwardedFor && req.headers['x-forwarded-for']) || (req.socket.remoteAddress ?? '');
 
 const port = Number(process.env.PORT ?? 8765);
 const db = await createMemoryDb();
@@ -45,7 +50,7 @@ createServer(async (req, res) => {
       const hasBody = !['GET', 'HEAD'].includes(req.method);
       const request = new Request(url, {
         method: req.method,
-        headers: { ...req.headers, 'x-vercel-forwarded-for': req.socket.remoteAddress ?? '' },
+        headers: { ...req.headers, 'x-vercel-forwarded-for': visitor(req) },
         body: hasBody ? await body(req) : undefined,
       });
       const out = await handle(request, { db });

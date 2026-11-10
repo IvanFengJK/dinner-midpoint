@@ -30,7 +30,11 @@
           Find a dinner spot that is fair for everyone to reach by public transport. Start a group,
           share the link, and each person adds their own work and home postal code.
         </p>
-        <h2 id="home-h">Start a group</h2>
+        <h2 id="home-h" tabindex="-1">Start a group</h2>
+        <div class="msgs">
+          <p id="home-status" role="status"></p>
+          <p id="home-error" class="err" role="alert"></p>
+        </div>
         <form id="create-form" class="entry" autocomplete="off">
           <label
             ><span class="k">Group name</span>
@@ -87,6 +91,10 @@
             /></label>
           </div>
           <button type="submit" id="create-go" class="primary tight">Start group</button>
+          <div class="msgs">
+            <p id="create-status" role="status"></p>
+            <p id="create-error" class="err" role="alert"></p>
+          </div>
           <p class="priv">
             Names and postal codes in a group are stored for 7 days after the last change. Group
             members see each other's names and work postal codes, and only a rough area (about 500
@@ -107,13 +115,26 @@
           <div id="people"></div>
           <button type="button" id="add" class="quiet">+ Add person</button>
           <button type="submit" id="go" class="primary">Find where to eat</button>
+          <div class="msgs">
+            <p id="quick-status" role="status"></p>
+            <p id="quick-error" class="err" role="alert"></p>
+          </div>
         </form>
         <button type="button" id="quick-close" class="linkish">Back to groups</button>
       </section>
 
       <section id="view-group" hidden aria-labelledby="group-h">
-        <h2 id="group-h">Group</h2>
+        <h2 id="group-h" tabindex="-1">Group</h2>
         <p id="group-meta" class="hint"></p>
+        <div class="msgs">
+          <p id="group-status" role="status"></p>
+          <p id="group-error" class="err" role="alert"></p>
+        </div>
+        <p id="storage-warning" class="warn" hidden>
+          This browser is blocking storage, so your links are kept only for this tab. Copy your
+          personal link below now, or you will not be able to edit your entry later.
+        </p>
+        <button type="button" id="group-retry" class="quiet" hidden>Try again</button>
         <ol id="members" class="members"></ol>
         <p id="group-wait" class="wait" hidden>
           Waiting for at least one more person. Share the group link so they can add their details.
@@ -160,6 +181,10 @@
           <div class="row">
             <button type="submit" id="entry-go" class="primary flat">Save</button>
             <button type="button" id="entry-cancel" class="act">Cancel</button>
+          </div>
+          <div class="msgs">
+            <p id="entry-status" role="status"></p>
+            <p id="entry-error" class="err" role="alert"></p>
           </div>
         </form>
         <details id="links" class="how">

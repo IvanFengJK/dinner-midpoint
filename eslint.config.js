@@ -40,9 +40,18 @@ export default [
       'stylelint.config.js',
       'tools/**/*.mjs',
       'tests/**/*.mjs',
+      'playwright.config.mjs',
       'api/**/*.js',
       'server/**/*.js',
     ],
     languageOptions: { sourceType: 'module', globals: globals.node },
+  },
+  {
+    // Browser tests: Node runs the test, and callbacks passed to page.evaluate run in the page.
+    files: ['e2e/**/*.mjs'],
+    languageOptions: {
+      sourceType: 'module',
+      globals: { ...globals.node, ...globals.browser },
+    },
   },
 ];

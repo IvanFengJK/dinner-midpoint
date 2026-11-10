@@ -350,6 +350,15 @@ button {
   font-weight: 600;
 }
 
+.warn {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: var(--plate);
+  border: 2px solid var(--amber);
+  border-radius: 8px;
+}
+
 /* Results */
 #out {
   margin-top: 12px;
@@ -611,6 +620,21 @@ h3 {
   color: var(--ink);
   background: var(--plate);
   border-color: var(--line);
+}
+
+/* Status and error messages that sit inside a form or view, next to what caused them */
+.msgs p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.msgs p:not(:empty) {
+  margin-top: 8px;
+}
+
+.msgs .err {
+  color: var(--bad);
+  font-weight: 600;
 }
 
 /* Groups */

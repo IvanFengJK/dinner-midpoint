@@ -15,7 +15,9 @@ export default defineConfig({
   // The real dev server: the page, the API and an in-memory Postgres.
   webServer: {
     command: 'node tools/dev-server.mjs',
-    env: { PORT: String(port) },
+    // Each browser context sends its own X-Forwarded-For (e2e/fixtures.mjs), so the per-visitor
+    // rate limit does not add up across tests.
+    env: { PORT: String(port), DEV_TRUST_FORWARDED_FOR: '1' },
     url: `http://localhost:${port}`,
     reuseExistingServer: false,
     timeout: 60_000,

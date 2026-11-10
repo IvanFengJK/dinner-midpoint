@@ -96,8 +96,9 @@
             <p id="create-error" class="err" role="alert"></p>
           </div>
           <p class="priv">
-            Names and postal codes in a group are stored for 7 days after the last change. Anyone
-            with the group link can see them.
+            Names and postal codes in a group are stored for 7 days after the last change. Group
+            members see each other's names and work postal codes, and only a rough area (about 500
+            m) for home.
           </p>
         </form>
         <button type="button" id="quick-open" class="linkish">
@@ -194,8 +195,8 @@
           <button type="button" id="delete-group" class="act danger">Delete this group</button>
         </div>
         <p class="priv">
-          Names and postal codes here are stored for 7 days after the last change. Anyone with the
-          group link can see them.
+          Names and postal codes here are stored for 7 days after the last change. Group members see
+          each other's names and work postal codes, and only a rough area (about 500 m) for home.
         </p>
       </section>
 
@@ -239,6 +240,8 @@
     ></script>
     <script src="transit.js"></script>
     <script src="groups.js"></script>
+    <script src="geocode.js"></script>
+    <script src="ranking.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

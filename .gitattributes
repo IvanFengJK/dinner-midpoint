@@ -1,0 +1,12 @@
+# Keep LF in the working tree on every OS so Prettier --check passes on Windows.
+* text=auto eol=lf
+
+# Binary files: never normalise line endings or diff as text.
+*.bin binary
+*.woff2 binary
+*.png binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary

@@ -8,7 +8,8 @@ Two ways to use it:
 
 - **Groups.** One person starts a group and shares the link. Each person adds their own name,
   work and home postal code, and can edit or remove only their own entry. Up to 10 people. Groups
-  delete themselves 7 days after the last change.
+  delete themselves 7 days after the last change, and never later than 30 days after they were
+  created, however often they are edited. Each group accepts at most 120 changes per hour.
 - **Quick calculator.** Type everyone in yourself. Nothing is saved.
 
 ## Versions
@@ -39,8 +40,12 @@ Two ways to use it:
 | Owner link `#g=<id>&o=<key>`             | the owner key             | remove any entry, delete the group |
 
 The keys sit after the `#`, which browsers never send to servers or in referrer headers. Only
-SHA-256 hashes of the keys are stored. Anyone holding a group link can see every name and postal
-code in that group, so the page says so.
+SHA-256 hashes of the keys are stored. Anyone holding a group link can see every name and work
+postal code in that group, so the page says so. Home is private: the API returns another person's
+home only as coordinates rounded to a 0.005-degree grid (about 550 m) with no postal code. The
+browser sends your personal key (`x-key`) on every group read, and only then is your own entry
+returned in full (`mine: true`). The owner key does not reveal anyone's home. Rankings and map pins
+for other people use the blurred position, so results can shift slightly.
 
 ## Run it locally
 
@@ -73,7 +78,14 @@ These steps need your accounts, so they are done by hand:
 3. **Add a cron secret.** In Settings, Environment Variables, add `CRON_SECRET` with a long random
    value (for example `openssl rand -hex 32`). Vercel sends it with the nightly clean-up call, and
    the clean-up refuses requests without it.
-4. **Deploy.** Push the branch. Every branch gets its own preview URL.
+4. **Add a rate-limit salt.** Add `RATE_LIMIT_SALT` with a long random value (for example
+   `openssl rand -hex 32`). Visitor addresses are stored only as an HMAC keyed with it. Until it
+   is set, the server falls back to a salt derived from `DATABASE_URL` and logs a warning.
+5. **Deploy.** Push the branch. Every branch gets its own preview URL.
+
+Environment variables: `DATABASE_URL` (set by Neon), `CRON_SECRET` and `RATE_LIMIT_SALT`. The rate
+limiter trusts only the `x-vercel-forwarded-for` header, which Vercel sets. Anywhere else all
+visitors share one limit, so do not host this server elsewhere without a trusted proxy header.
 
 Expired groups are never shown, even before the nightly clean-up removes them.
 
@@ -86,16 +98,16 @@ Expired groups are never shown, even before the nightly clean-up removes them.
 
 ## Files
 
-| Path                                                           | What it is                                                      |
-| -------------------------------------------------------------- | --------------------------------------------------------------- |
-| `index.html`, `app.js`, `groups.js`, `transit.js`, `style.css` | the page                                                        |
-| `data/graph.*`                                                 | the transit graph the page loads                                |
-| `api/`                                                         | Vercel Function entry points (thin wrappers)                    |
-| `server/`                                                      | routing, validation, SQL, rate limiting                         |
-| `tests/`                                                       | `npm test`                                                      |
-| `e2e/`, `playwright.config.mjs`                                | `npm run e2e` (Chromium; OneMap and the CDN are stubbed)        |
-| `tools/`                                                       | build, site check, local dev server                             |
-| `scripts/`, `data/*.json`                                      | Python scripts and inputs that rebuild the graph (not deployed) |
+| Path                                                                                       | What it is                                                      |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| `index.html`, `app.js`, `groups.js`, `geocode.js`, `ranking.js`, `transit.js`, `style.css` | the page                                                        |
+| `data/graph.*`                                                                             | the transit graph the page loads                                |
+| `api/`                                                                                     | Vercel Function entry points (thin wrappers)                    |
+| `server/`                                                                                  | routing, validation, SQL, rate limiting                         |
+| `tests/`                                                                                   | `npm test`                                                      |
+| `e2e/`, `playwright.config.mjs`                                                            | `npm run e2e` (Chromium; OneMap and the CDN are stubbed)        |
+| `tools/`                                                                                   | build, site check, local dev server                             |
+| `scripts/`, `data/*.json`                                                                  | Python scripts and inputs that rebuild the graph (not deployed) |
 
 ## Data
 
@@ -103,3 +115,16 @@ Bus stops and routes from [busrouter.sg](https://busrouter.sg) (© LTA, OneMap, 
 contributors), rail lines and malls from OpenStreetMap, postal-code search and map tiles from OneMap
 (Singapore Land Authority). The OneMap token in `.env` is used only by the offline calibration scripts,
 never by the page or the API.
+
+Two JSON files record how the travel-time estimate was checked against OneMap (neither is read at
+runtime):
+
+- `data/calibration.json`: OneMap vs the graph for about 30 station pairs, written by
+  `scripts/calibrate.py` and read by `scripts/eval_graph.py`.
+- `data/holdout-busstop-mall.json`: a held-out set of random bus stop to mall trips (ordinary points,
+  not stations), written by `scripts/validate_addresses.py`.
+
+`data/bus/firstlast.min.json` is not used yet; it is kept for a planned last-bus filter. The unused
+`data/bus/routes.min.json` was removed. If it is ever needed again, it is in git history
+(`git show 88637e4:data/bus/routes.min.json`) and comes from the same [busrouter.sg](https://busrouter.sg)
+dataset as the other `data/bus/*.min.json` files.

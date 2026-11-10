@@ -1,0 +1,26 @@
+{
+  "name": "dinner-midpoint",
+  "private": true,
+  "description": "Static site. Dev tooling only: nothing here is shipped to the browser.",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "lint": "npm run lint:js && npm run lint:css && npm run lint:html",
+    "lint:js": "eslint .",
+    "lint:css": "stylelint style.css",
+    "lint:html": "html-validate index.html",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "build": "node tools/build-site.mjs",
+    "check:site": "node tools/check-site.mjs _site"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.14.0",
+    "globals": "17.14.0",
+    "html-validate": "11.21.0",
+    "prettier": "3.9.10",
+    "stylelint": "18.0.0",
+    "stylelint-config-standard": "41.0.0"
+  }
+}

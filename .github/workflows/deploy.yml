@@ -1,0 +1,89 @@
+# CD: on every push to main, run the full CI gate, build the allowlisted
+# artifact, and (only when enabled) publish it to GitHub Pages.
+#
+# Safe by default: the deploy job is skipped unless the repository variable
+# DEPLOY_ENABLED is 'true' (Settings > Secrets and variables > Actions > Variables).
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false # never interrupt a deploy that is already running
+
+jobs:
+  ci:
+    name: CI gate
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      pull-requests: read
+
+  build:
+    name: Build artifact
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: npm run check:site
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+  deploy:
+    name: Publish to GitHub Pages
+    needs: build
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+  smoke:
+    name: Smoke test live site
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SITE_URL: ${{ needs.deploy.outputs.page_url }}
+    steps:
+      - name: Page and data files respond
+        run: |
+          set -euo pipefail
+          check() {
+            for attempt in 1 2 3 4 5; do
+              code=$(curl -s -o /tmp/body -w '%{http_code}' "${SITE_URL}${1}" || true)
+              [ "$code" = "200" ] && return 0
+              sleep $((attempt * 3))
+            done
+            echo "::error::${SITE_URL}${1} returned ${code}"; return 1
+          }
+          check ""
+          grep -q "Where To Eat Ah" /tmp/body
+          check "data/graph.json"
+          check "data/graph.bin"
+          check "app.js"

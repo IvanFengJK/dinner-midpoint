@@ -1,0 +1,6 @@
+.env
+*.local
+node_modules/
+_site/
+__pycache__/
+.ruff_cache/

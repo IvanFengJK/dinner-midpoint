@@ -1,0 +1,13 @@
+# Python is build-time only (scripts/ regenerates data/). It is never deployed.
+target-version = "py312"
+line-length = 100
+extend-exclude = ["_site", "node_modules"]
+
+[lint]
+# Bugs and security only. Style rules (line length, one-liners) are deliberately
+# off: these scripts are offline data tooling, and style is handled by `ruff format`.
+# E9 syntax errors, F pyflakes, B bugbear, S bandit (security)
+select = ["E9", "F", "B", "S"]
+ignore = [
+  "S311", # random is used for sampling in calibration, not for anything security-related
+]

@@ -14,7 +14,7 @@ export default [
         L: 'readonly', // Leaflet, loaded from the CDN
         Transit: 'readonly', // set by transit.js
         Groups: 'readonly', // set by groups.js
-        module: 'readonly', // transit.js is UMD: guarded by typeof module
+        Ranking: 'readonly', // set by ranking.js
       },
     },
     rules: {

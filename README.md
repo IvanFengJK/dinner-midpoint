@@ -80,15 +80,15 @@ Expired groups are never shown, even before the nightly clean-up removes them.
 
 ## Files
 
-| Path                                                           | What it is                                                      |
-| -------------------------------------------------------------- | --------------------------------------------------------------- |
-| `index.html`, `app.js`, `groups.js`, `transit.js`, `style.css` | the page                                                        |
-| `data/graph.*`                                                 | the transit graph the page loads                                |
-| `api/`                                                         | Vercel Function entry points (thin wrappers)                    |
-| `server/`                                                      | routing, validation, SQL, rate limiting                         |
-| `tests/`                                                       | `npm test`                                                      |
-| `tools/`                                                       | build, site check, local dev server                             |
-| `scripts/`, `data/*.json`                                      | Python scripts and inputs that rebuild the graph (not deployed) |
+| Path                                                                         | What it is                                                      |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `index.html`, `app.js`, `groups.js`, `ranking.js`, `transit.js`, `style.css` | the page                                                        |
+| `data/graph.*`                                                               | the transit graph the page loads                                |
+| `api/`                                                                       | Vercel Function entry points (thin wrappers)                    |
+| `server/`                                                                    | routing, validation, SQL, rate limiting                         |
+| `tests/`                                                                     | `npm test`                                                      |
+| `tools/`                                                                     | build, site check, local dev server                             |
+| `scripts/`, `data/*.json`                                                    | Python scripts and inputs that rebuild the graph (not deployed) |
 
 ## Data
 
@@ -96,3 +96,16 @@ Bus stops and routes from [busrouter.sg](https://busrouter.sg) (© LTA, OneMap, 
 contributors), rail lines and malls from OpenStreetMap, postal-code search and map tiles from OneMap
 (Singapore Land Authority). The OneMap token in `.env` is used only by the offline calibration scripts,
 never by the page or the API.
+
+Two JSON files record how the travel-time estimate was checked against OneMap (neither is read at
+runtime):
+
+- `data/calibration.json`: OneMap vs the graph for about 30 station pairs, written by
+  `scripts/calibrate.py` and read by `scripts/eval_graph.py`.
+- `data/holdout-busstop-mall.json`: a held-out set of random bus stop to mall trips (ordinary points,
+  not stations), written by `scripts/validate_addresses.py`.
+
+`data/bus/firstlast.min.json` is not used yet; it is kept for a planned last-bus filter. The unused
+`data/bus/routes.min.json` was removed. If it is ever needed again, it is in git history
+(`git show 88637e4:data/bus/routes.min.json`) and comes from the same [busrouter.sg](https://busrouter.sg)
+dataset as the other `data/bus/*.min.json` files.

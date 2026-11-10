@@ -479,7 +479,7 @@ async function loadGroup(initial = false) {
   const id = state.id;
   if (!id) return;
   try {
-    const data = await Groups.request('GET', `/${id}`);
+    const data = await Groups.request('GET', `/${id}`, { key: Groups.creds(id).memberKey });
     if (id !== state.id) return;
     renderGroup(data, initial);
     startPolling();
@@ -498,7 +498,7 @@ async function loadGroup(initial = false) {
 // ---------- Group screen ----------
 function renderGroup(data, initial) {
   const creds = Groups.creds(data.id);
-  const me = creds.memberId ? data.members.find((m) => m.id === creds.memberId) : null;
+  const me = data.members.find((m) => m.mine) || null;
   const owner = Boolean(creds.ownerKey);
   state.data = data;
 
@@ -509,7 +509,7 @@ function renderGroup(data, initial) {
   const list = $('members');
   list.replaceChildren(
     ...data.members.map((m) => {
-      const mine = me && m.id === me.id;
+      const mine = Boolean(m.mine);
       const acts = el('div', { className: 'acts' });
       if (mine) {
         const edit = el(
@@ -539,7 +539,11 @@ function renderGroup(data, initial) {
           'div',
           { className: 'info' },
           nameLine,
-          el('p', { className: 'places' }, `Work ${m.work.postal} · Home ${m.home.postal}`),
+          el(
+            'p',
+            { className: 'places' },
+            `Work ${m.work.postal} · ${mine ? `Home ${m.home.postal}` : 'Home: rough area only'}`,
+          ),
         ),
         acts,
       );

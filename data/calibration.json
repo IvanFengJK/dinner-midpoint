@@ -1,0 +1,242 @@
+[
+ {
+  "from": "Chinese Garden",
+  "to": "Siglap",
+  "km": 22.2,
+  "actual_min": 53.1,
+  "transfers": 1,
+  "estimate_min": 58.9
+ },
+ {
+  "from": "Boon Lay",
+  "to": "Holland Village",
+  "km": 10.5,
+  "actual_min": 25.5,
+  "transfers": 1,
+  "estimate_min": 33.1
+ },
+ {
+  "from": "Cashew",
+  "to": "Punggol",
+  "km": 15.8,
+  "actual_min": 54.6,
+  "transfers": 1,
+  "estimate_min": 44.8
+ },
+ {
+  "from": "Outram Park",
+  "to": "Petir",
+  "km": 13.4,
+  "actual_min": 50.5,
+  "transfers": 2,
+  "estimate_min": 39.6
+ },
+ {
+  "from": "Telok Ayer",
+  "to": "Marine Parade",
+  "km": 6.9,
+  "actual_min": 29.1,
+  "transfers": 0,
+  "estimate_min": 25.2
+ },
+ {
+  "from": "Farrer Park",
+  "to": "Bukit Gombak",
+  "km": 12.5,
+  "actual_min": 49.8,
+  "transfers": 2,
+  "estimate_min": 37.5
+ },
+ {
+  "from": "Prince Edward Road",
+  "to": "Bayshore",
+  "km": 11.5,
+  "actual_min": 42.7,
+  "transfers": 1,
+  "estimate_min": 35.3
+ },
+ {
+  "from": "Marsiling",
+  "to": "Novena",
+  "km": 14.7,
+  "actual_min": 36.4,
+  "transfers": 0,
+  "estimate_min": 42.3
+ },
+ {
+  "from": "Tai Seng",
+  "to": "Admiralty",
+  "km": 15.2,
+  "actual_min": 41.5,
+  "transfers": 1,
+  "estimate_min": 43.4
+ },
+ {
+  "from": "Woodlands",
+  "to": "Orchard Boulevard",
+  "km": 15.3,
+  "actual_min": 36.4,
+  "transfers": 0,
+  "estimate_min": 43.8
+ },
+ {
+  "from": "Jalan Besar",
+  "to": "Yishun",
+  "km": 14.0,
+  "actual_min": 40.0,
+  "transfers": 1,
+  "estimate_min": 40.8
+ },
+ {
+  "from": "Geylang Bahru",
+  "to": "Springleaf",
+  "km": 10.4,
+  "actual_min": 47.3,
+  "transfers": 2,
+  "estimate_min": 32.9
+ },
+ {
+  "from": "Buona Vista",
+  "to": "Khatib",
+  "km": 13.2,
+  "actual_min": 38.6,
+  "transfers": 1,
+  "estimate_min": 38.9
+ },
+ {
+  "from": "Bayshore",
+  "to": "Bartley",
+  "km": 7.7,
+  "actual_min": 32.3,
+  "transfers": 2,
+  "estimate_min": 26.9
+ },
+ {
+  "from": "Samudera",
+  "to": "Ang Mo Kio",
+  "km": 7.8,
+  "actual_min": 46.3,
+  "transfers": 2,
+  "estimate_min": 27.1
+ },
+ {
+  "from": "Marine Parade",
+  "to": "Ubi",
+  "km": 3.0,
+  "actual_min": 22.7,
+  "transfers": 1,
+  "estimate_min": 16.7
+ },
+ {
+  "from": "Fernvale",
+  "to": "Nibong",
+  "km": 3.5,
+  "actual_min": 20.9,
+  "transfers": 2,
+  "estimate_min": 17.6
+ },
+ {
+  "from": "Bayshore",
+  "to": "Rochor",
+  "km": 9.9,
+  "actual_min": 41.3,
+  "transfers": 1,
+  "estimate_min": 31.8
+ },
+ {
+  "from": "Fort Canning",
+  "to": "One-North",
+  "km": 6.4,
+  "actual_min": 31.8,
+  "transfers": 2,
+  "estimate_min": 24.0
+ },
+ {
+  "from": "Great World",
+  "to": "Lavender",
+  "km": 3.6,
+  "actual_min": 23.4,
+  "transfers": 1,
+  "estimate_min": 18.0
+ },
+ {
+  "from": "Great World",
+  "to": "Tuas Link",
+  "km": 22.4,
+  "actual_min": 57.9,
+  "transfers": 1,
+  "estimate_min": 59.3
+ },
+ {
+  "from": "Fort Canning",
+  "to": "Pasir Ris",
+  "km": 14.7,
+  "actual_min": 42.6,
+  "transfers": 1,
+  "estimate_min": 42.3
+ },
+ {
+  "from": "Kallang",
+  "to": "Bartley",
+  "km": 3.6,
+  "actual_min": 15.1,
+  "transfers": 1,
+  "estimate_min": 17.9
+ },
+ {
+  "from": "Napier",
+  "to": "Senja",
+  "km": 10.6,
+  "actual_min": 54.3,
+  "transfers": 2,
+  "estimate_min": 33.3
+ },
+ {
+  "from": "Teck Lee",
+  "to": "Bukit Panjang",
+  "km": 16.5,
+  "actual_min": 66.2,
+  "transfers": 1,
+  "estimate_min": 46.3
+ },
+ {
+  "from": "Downtown",
+  "to": "Tanjong Katong",
+  "km": 5.4,
+  "actual_min": 19.2,
+  "transfers": 0,
+  "estimate_min": 22.0
+ },
+ {
+  "from": "Kangkar",
+  "to": "Cashew",
+  "km": 15.4,
+  "actual_min": 59.0,
+  "transfers": 2,
+  "estimate_min": 43.9
+ },
+ {
+  "from": "Kupang",
+  "to": "Yishun",
+  "km": 6.2,
+  "actual_min": 46.3,
+  "transfers": 0,
+  "estimate_min": 23.6
+ },
+ {
+  "from": "Yew Tee",
+  "to": "Punggol Point",
+  "km": 17.9,
+  "actual_min": 70.6,
+  "transfers": 2,
+  "estimate_min": 49.3
+ },
+ {
+  "from": "Nibong",
+  "to": "Queenstown",
+  "km": 16.7,
+  "actual_min": 51.7,
+  "transfers": 2,
+  "estimate_min": 46.8
+ }
+]

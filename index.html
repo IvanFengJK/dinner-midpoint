@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Where To Eat Ah?</title>
+<link rel="preload" href="fonts/atkinson-hyperlegible-next.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="panel">
+  <header class="sign"><h1>Where To Eat Ah?</h1></header>
+  <p class="sub">Enter each person's work and home postal code. We find the places that are fairest for everyone to reach by public transport.</p>
+
+  <form id="form" autocomplete="off">
+    <div id="people"></div>
+    <button type="button" id="add" class="quiet">+ Add person</button>
+
+    <fieldset class="seg">
+      <legend>Meet at</legend>
+      <label><input type="radio" name="mode" value="malls" checked><span>Malls</span></label>
+      <label><input type="radio" name="mode" value="stations"><span>MRT stations</span></label>
+    </fieldset>
+
+    <button type="submit" id="go">Find where to eat</button>
+    <p class="priv">Nothing you type is stored.</p>
+  </form>
+
+  <p id="status" role="status"></p>
+
+  <section id="out" hidden aria-labelledby="out-h">
+    <h2 id="out-h">Fairest places</h2>
+    <p class="hint">Bars show each person's extra minutes versus going straight from work to home. On the map, filled pins are these places and white pins are people: square for work, circle for home.</p>
+    <ol id="results"></ol>
+  </section>
+
+  <details class="how">
+    <summary>How we rank places</summary>
+    <p>Travel times are estimates for a weekday evening, worked out from bus routes and MRT lines (not live timetables). Fair means the smallest worst-case detour: the extra time versus going straight from work to home.</p>
+  </details>
+</main>
+<div id="map" role="region" aria-label="Map of suggested places"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="transit.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

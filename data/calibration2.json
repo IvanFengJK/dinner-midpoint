@@ -1,0 +1,242 @@
+[
+ {
+  "from": "Bef Ang Mo Kio Polyclinic",
+  "to": "Clementi 321",
+  "km": 11.3,
+  "actual": 57.7,
+  "graph": 53.1,
+  "fit": 41.1
+ },
+ {
+  "from": "Opp Blk 475B",
+  "to": "Roxy Square",
+  "km": 8.0,
+  "actual": 60.4,
+  "graph": 58.5,
+  "fit": 34.4
+ },
+ {
+  "from": "Tentera Diraja Mque",
+  "to": "Boon Lay Shopping Centre",
+  "km": 8.3,
+  "actual": 43.6,
+  "graph": 44.5,
+  "fit": 35.0
+ },
+ {
+  "from": "Eunos Int",
+  "to": "Bukit Panjang Plaza",
+  "km": 16.8,
+  "actual": 55.0,
+  "graph": 50.4,
+  "fit": 52.2
+ },
+ {
+  "from": "Opp Yishun Stn",
+  "to": "Parklane Shopping Mall",
+  "km": 14.3,
+  "actual": 40.9,
+  "graph": 43.3,
+  "fit": 47.2
+ },
+ {
+  "from": "Blk 716",
+  "to": "nex",
+  "km": 13.4,
+  "actual": 42.8,
+  "graph": 54.4,
+  "fit": 45.3
+ },
+ {
+  "from": "Blk 125",
+  "to": "E! Hub",
+  "km": 3.3,
+  "actual": 31.2,
+  "graph": 32.4,
+  "fit": 24.9
+ },
+ {
+  "from": "Al-Amin Mque",
+  "to": "Bugis Junction",
+  "km": 4.8,
+  "actual": 32.3,
+  "graph": 31.5,
+  "fit": 27.9
+ },
+ {
+  "from": "St. Gabriel's Pr Sch",
+  "to": "King's Arcade",
+  "km": 6.4,
+  "actual": 27.9,
+  "graph": 30.1,
+  "fit": 31.1
+ },
+ {
+  "from": "Aft Clementi Fire Stn",
+  "to": "Fajar Shopping Centre",
+  "km": 7.1,
+  "actual": 46.9,
+  "graph": 48.2,
+  "fit": 32.5
+ },
+ {
+  "from": "Jurong Sec Sch",
+  "to": "Orchard Plaza",
+  "km": 13.4,
+  "actual": 63.2,
+  "graph": 63.1,
+  "fit": 45.2
+ },
+ {
+  "from": "Punggol View Pr Sch",
+  "to": "Bencoolen",
+  "km": 13.4,
+  "actual": 35.5,
+  "graph": 41.7,
+  "fit": 45.4
+ },
+ {
+  "from": "Opp Camelot By-The-Water",
+  "to": "Changi Airport Terminal 2",
+  "km": 14.3,
+  "actual": 64.0,
+  "graph": 55.6,
+  "fit": 47.1
+ },
+ {
+  "from": "Opp Hong San Terr",
+  "to": "Queensway Shopping Centre",
+  "km": 11.8,
+  "actual": 61.1,
+  "graph": 55.9,
+  "fit": 42.0
+ },
+ {
+  "from": "Havelock Stn Exit 5",
+  "to": "Parklane Shopping Mall",
+  "km": 2.1,
+  "actual": 22.7,
+  "graph": 20.6,
+  "fit": 22.4
+ },
+ {
+  "from": "Opp Fairfield Meth Pr Sch",
+  "to": "Paragon",
+  "km": 5.7,
+  "actual": 40.2,
+  "graph": 38.1,
+  "fit": 29.6
+ },
+ {
+  "from": "Upp Changi Stn/Opp SUTD",
+  "to": "Katong Plaza",
+  "km": 7.6,
+  "actual": 38.8,
+  "graph": 45.9,
+  "fit": 33.6
+ },
+ {
+  "from": "Aft Architecture Dr",
+  "to": "Eastlink Mall",
+  "km": 20.4,
+  "actual": 64.5,
+  "graph": 71.7,
+  "fit": 59.4
+ },
+ {
+  "from": "Heng Mui Keng Terr",
+  "to": "Orchard Shopping Centre",
+  "km": 7.2,
+  "actual": 41.2,
+  "graph": 45.4,
+  "fit": 32.8
+ },
+ {
+  "from": "Blk 301A",
+  "to": "CityLink Mall",
+  "km": 13.7,
+  "actual": 44.2,
+  "graph": 47.2,
+  "fit": 46.0
+ },
+ {
+  "from": "Bef Lor 110 Changi",
+  "to": "Changi Airport Terminal 1",
+  "km": 10.3,
+  "actual": 37.9,
+  "graph": 44.7,
+  "fit": 39.0
+ },
+ {
+  "from": "Christ Meth Ch",
+  "to": "HillV2 Mall",
+  "km": 17.9,
+  "actual": 62.1,
+  "graph": 65.4,
+  "fit": 54.4
+ },
+ {
+  "from": "Waterfront Key",
+  "to": "Thomson Plaza",
+  "km": 11.3,
+  "actual": 50.3,
+  "graph": 45.5,
+  "fit": 41.1
+ },
+ {
+  "from": "Newton Stn Exit C",
+  "to": "Canberra Plaza",
+  "km": 14.4,
+  "actual": 34.6,
+  "graph": 33.8,
+  "fit": 47.4
+ },
+ {
+  "from": "Airline Hse",
+  "to": "Palais Renaissance",
+  "km": 20.2,
+  "actual": 90.0,
+  "graph": 100.6,
+  "fit": 59.2
+ },
+ {
+  "from": "Blk 123B",
+  "to": "Junction 10",
+  "km": 3.7,
+  "actual": 25.8,
+  "graph": 32.6,
+  "fit": 25.6
+ },
+ {
+  "from": "Blk 734A CP",
+  "to": "Orchard Gateway @ Emerald",
+  "km": 16.1,
+  "actual": 58.0,
+  "graph": 61.0,
+  "fit": 50.8
+ },
+ {
+  "from": "Bef Weyhill Cl",
+  "to": "PARKTOWN",
+  "km": 17.7,
+  "actual": 83.8,
+  "graph": 76.5,
+  "fit": 54.0
+ },
+ {
+  "from": "Aft HortPark",
+  "to": "Plaza Singapura",
+  "km": 5.3,
+  "actual": 31.2,
+  "graph": 37.8,
+  "fit": 28.8
+ },
+ {
+  "from": "Opp Hillview Apts",
+  "to": "Mustafa Centre",
+  "km": 11.7,
+  "actual": 55.2,
+  "graph": 49.3,
+  "fit": 41.8
+ }
+]

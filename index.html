@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
     <title>Where To Eat Ah?</title>
+    <link rel="icon" href="data:," />
     <link
       rel="preload"
       href="fonts/atkinson-hyperlegible-next.woff2"
@@ -23,15 +24,160 @@
   <body>
     <main id="panel">
       <header class="sign"><h1>Where To Eat Ah?</h1></header>
-      <p class="sub">
-        Enter each person's work and home postal code. We find the places that are fairest for
-        everyone to reach by public transport.
-      </p>
 
-      <form id="form" autocomplete="off">
-        <div id="people"></div>
-        <button type="button" id="add" class="quiet">+ Add person</button>
+      <section id="view-home" aria-labelledby="home-h">
+        <p class="sub">
+          Find a dinner spot that is fair for everyone to reach by public transport. Start a group,
+          share the link, and each person adds their own work and home postal code.
+        </p>
+        <h2 id="home-h">Start a group</h2>
+        <form id="create-form" class="entry" autocomplete="off">
+          <label
+            ><span class="k">Group name</span>
+            <input
+              id="create-group"
+              class="txt"
+              type="text"
+              maxlength="40"
+              placeholder="e.g. Friday dinner"
+              required
+          /></label>
+          <label
+            ><span class="k">Your name</span>
+            <input
+              id="create-name"
+              class="txt"
+              type="text"
+              maxlength="30"
+              placeholder="e.g. Ann"
+              required
+          /></label>
+          <div class="fields">
+            <label
+              ><span class="k"
+                ><i class="sq" aria-hidden="true"></i>Your work<span class="sr">
+                  postal code</span
+                ></span
+              >
+              <input
+                id="create-work"
+                type="text"
+                inputmode="numeric"
+                maxlength="6"
+                pattern="\d{6}"
+                placeholder="e.g. 238801"
+                spellcheck="false"
+                required
+            /></label>
+            <label
+              ><span class="k"
+                ><i class="dot" aria-hidden="true"></i>Your home<span class="sr">
+                  postal code</span
+                ></span
+              >
+              <input
+                id="create-home"
+                type="text"
+                inputmode="numeric"
+                maxlength="6"
+                pattern="\d{6}"
+                placeholder="e.g. 558762"
+                spellcheck="false"
+                required
+            /></label>
+          </div>
+          <button type="submit" id="create-go" class="primary tight">Start group</button>
+          <p class="priv">
+            Names and postal codes in a group are stored for 7 days after the last change. Anyone
+            with the group link can see them.
+          </p>
+        </form>
+        <button type="button" id="quick-open" class="linkish">
+          Just trying it? Use the quick calculator (nothing is saved)
+        </button>
+      </section>
 
+      <section id="view-quick" hidden aria-labelledby="quick-h">
+        <h2 id="quick-h">Quick calculator</h2>
+        <p class="sub">
+          Enter everyone's work and home postal code yourself. Nothing you type is stored.
+        </p>
+        <form id="form" autocomplete="off">
+          <div id="people"></div>
+          <button type="button" id="add" class="quiet">+ Add person</button>
+          <button type="submit" id="go" class="primary">Find where to eat</button>
+        </form>
+        <button type="button" id="quick-close" class="linkish">Back to groups</button>
+      </section>
+
+      <section id="view-group" hidden aria-labelledby="group-h">
+        <h2 id="group-h">Group</h2>
+        <p id="group-meta" class="hint"></p>
+        <ol id="members" class="members"></ol>
+        <p id="group-wait" class="wait" hidden>
+          Waiting for at least one more person. Share the group link so they can add their details.
+        </p>
+        <button type="button" id="join-open" class="quiet" hidden>+ Add your details</button>
+        <form id="entry-form" class="entry" hidden autocomplete="off">
+          <h3 id="entry-h">Your details</h3>
+          <label
+            ><span class="k">Your name</span>
+            <input id="entry-name" class="txt" type="text" maxlength="30" required
+          /></label>
+          <div class="fields">
+            <label
+              ><span class="k"
+                ><i class="sq" aria-hidden="true"></i>Work<span class="sr"> postal code</span></span
+              >
+              <input
+                id="entry-work"
+                type="text"
+                inputmode="numeric"
+                maxlength="6"
+                pattern="\d{6}"
+                placeholder="e.g. 238801"
+                spellcheck="false"
+                required
+            /></label>
+            <label
+              ><span class="k"
+                ><i class="dot" aria-hidden="true"></i>Home<span class="sr">
+                  postal code</span
+                ></span
+              >
+              <input
+                id="entry-home"
+                type="text"
+                inputmode="numeric"
+                maxlength="6"
+                pattern="\d{6}"
+                placeholder="e.g. 558762"
+                spellcheck="false"
+                required
+            /></label>
+          </div>
+          <div class="row">
+            <button type="submit" id="entry-go" class="primary flat">Save</button>
+            <button type="button" id="entry-cancel" class="act">Cancel</button>
+          </div>
+        </form>
+        <details id="links" class="how">
+          <summary>Share and save your links</summary>
+          <div id="links-body"></div>
+        </details>
+        <div id="owner-tools" hidden>
+          <button type="button" id="delete-group" class="act danger">Delete this group</button>
+        </div>
+        <p class="priv">
+          Names and postal codes here are stored for 7 days after the last change. Anyone with the
+          group link can see them.
+        </p>
+      </section>
+
+      <p id="status" role="status"></p>
+
+      <section id="out" hidden aria-labelledby="out-h">
+        <h2 id="out-h">Fairest places</h2>
         <fieldset class="seg">
           <legend>Meet at</legend>
           <label><input type="radio" name="mode" value="malls" checked /><span>Malls</span></label>
@@ -39,15 +185,6 @@
             ><input type="radio" name="mode" value="stations" /><span>MRT stations</span></label
           >
         </fieldset>
-
-        <button type="submit" id="go">Find where to eat</button>
-        <p class="priv">Nothing you type is stored.</p>
-      </form>
-
-      <p id="status" role="status"></p>
-
-      <section id="out" hidden aria-labelledby="out-h">
-        <h2 id="out-h">Fairest places</h2>
         <p class="hint">
           Bars show each person's extra minutes versus going straight from work to home. On the map,
           filled pins are these places and white pins are people: square for work, circle for home.
@@ -62,6 +199,11 @@
           (not live timetables). Fair means the smallest worst-case detour: the extra time versus
           going straight from work to home.
         </p>
+        <p>
+          Data: bus stops and routes from busrouter.sg (© LTA, OneMap, OpenStreetMap contributors),
+          rail lines and malls from OpenStreetMap, postal codes and map tiles from OneMap (Singapore
+          Land Authority).
+        </p>
       </details>
     </main>
     <section id="map" aria-label="Map of suggested places"></section>
@@ -71,6 +213,7 @@
       crossorigin=""
     ></script>
     <script src="transit.js"></script>
+    <script src="groups.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

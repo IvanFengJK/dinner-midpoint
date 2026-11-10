@@ -1,13 +1,14 @@
-# CD: on every push to main, run the full CI gate, build the allowlisted
-# artifact, and (only when enabled) publish it to GitHub Pages.
+# GitHub Pages serves the frozen v1.0.0 static page (the original, no-groups version).
+# v2 (shareable groups) is hosted on Vercel, which deploys from main on its own.
+#
+# This workflow therefore never runs on a push. Run it by hand to republish v1.0.0:
+# it builds from the v1.0.0 tag, not from main.
 #
 # Safe by default: the deploy job is skipped unless the repository variable
 # DEPLOY_ENABLED is 'true' (Settings > Secrets and variables > Actions > Variables).
 name: Deploy
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -32,6 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: v1.0.0
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:

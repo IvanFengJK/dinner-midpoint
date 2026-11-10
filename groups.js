@@ -123,6 +123,5 @@
   }
 
   const api = { parseHash, links, creds, save, forget, request, latest };
-  if (typeof module !== 'undefined') module.exports = api;
-  else root.Groups = api;
+  root.Groups = api;
 })(typeof window !== 'undefined' ? window : globalThis);

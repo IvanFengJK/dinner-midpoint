@@ -5,19 +5,8 @@ export default [
   { ignores: ['_site/', 'node_modules/', 'data/'] },
   js.configs.recommended,
   {
-    files: ['**/*.js'],
-    languageOptions: {
-      ecmaVersion: 2023,
-      sourceType: 'script', // plain <script> tags, not ES modules
-      globals: {
-        ...globals.browser,
-        L: 'readonly', // Leaflet, loaded from the CDN
-        Transit: 'readonly', // set by transit.js
-        Groups: 'readonly', // set by groups.js
-        Geocode: 'readonly', // set by geocode.js
-        module: 'readonly', // transit.js is UMD: guarded by typeof module
-      },
-    },
+    files: ['**/*.{js,mjs}'],
+    languageOptions: { ecmaVersion: 2023 },
     rules: {
       eqeqeq: 'error',
       'no-eval': 'error',
@@ -26,6 +15,22 @@ export default [
       'no-script-url': 'error',
       'no-var': 'error',
       'prefer-const': 'error',
+    },
+  },
+  {
+    // Page scripts: plain <script> tags, not ES modules, browser globals only.
+    files: ['*.js'],
+    ignores: ['eslint.config.js', 'stylelint.config.js'],
+    languageOptions: {
+      sourceType: 'script',
+      globals: {
+        ...globals.browser,
+        L: 'readonly', // Leaflet, loaded from the CDN
+        Transit: 'readonly', // set by transit.js
+        Groups: 'readonly', // set by groups.js
+        Ranking: 'readonly', // set by ranking.js
+        Geocode: 'readonly', // set by geocode.js
+      },
     },
   },
   {

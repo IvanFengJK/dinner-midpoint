@@ -66,6 +66,5 @@
   }
 
   const api = { createGeocoder };
-  if (typeof module !== 'undefined') module.exports = api;
-  else root.Geocode = api;
+  root.Geocode = api;
 })(typeof window !== 'undefined' ? window : globalThis);

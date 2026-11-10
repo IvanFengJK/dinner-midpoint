@@ -17,6 +17,9 @@ const siteHeaders = Object.fromEntries(
   ),
 );
 
+// The limiter only trusts the address Vercel's edge sets. Locally this server plays that edge.
+process.env.VERCEL ||= '1';
+
 const port = Number(process.env.PORT ?? 8765);
 const db = await createMemoryDb();
 const published = new Set(PUBLISHED_FILES);
@@ -42,7 +45,7 @@ createServer(async (req, res) => {
       const hasBody = !['GET', 'HEAD'].includes(req.method);
       const request = new Request(url, {
         method: req.method,
-        headers: req.headers,
+        headers: { ...req.headers, 'x-vercel-forwarded-for': req.socket.remoteAddress ?? '' },
         body: hasBody ? await body(req) : undefined,
       });
       const out = await handle(request, { db });

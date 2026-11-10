@@ -8,6 +8,7 @@ export const PUBLISHED_FILES = [
   'transit.js',
   'groups.js',
   'geocode.js',
+  'ranking.js',
   'style.css',
   'fonts/atkinson-hyperlegible-next.woff2',
   'data/graph.json',

@@ -133,6 +133,5 @@
   };
 
   const api = { Graph, distKm, walkMin };
-  if (typeof module !== 'undefined') module.exports = api;
-  else root.Transit = api;
+  root.Transit = api;
 })(typeof window !== 'undefined' ? window : globalThis);

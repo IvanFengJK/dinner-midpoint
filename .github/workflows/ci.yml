@@ -49,6 +49,26 @@ jobs:
       - name: Ruff (Python build scripts)
         run: pip install "ruff==${RUFF_VERSION}" && ruff check scripts
 
+  e2e:
+    name: Browser tests (Playwright, Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci --ignore-scripts
+      # The browser build is pinned by the exact @playwright/test version in package-lock.json.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      # Starts the dev server itself. OneMap and the CDN are answered locally: no network needed.
+      - name: Browser tests (page against the real API, in-memory Postgres)
+        run: npm run e2e
+
   format:
     name: Format check
     runs-on: ubuntu-latest

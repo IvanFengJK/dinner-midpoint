@@ -233,6 +233,21 @@ function setStatus(text, isError = false) {
   node.classList.toggle('err', isError);
 }
 
+// Messages live next to what caused them: a status line and an error line (a live region
+// each) inside the form or view named by `region`: home, create, quick, group or entry.
+function clearMessages() {
+  for (const r of ['home', 'create', 'quick', 'group', 'entry']) say(r);
+  setStatus('');
+}
+
+function say(region, text = '', isError = false) {
+  $(`${region}-status`).textContent = isError ? '' : text;
+  const error = $(`${region}-error`);
+  error.textContent = isError ? text : '';
+  if (isError)
+    error.scrollIntoView({ block: 'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' });
+}
+
 // ---------- Results (shared by the quick calculator and groups) ----------
 // people: [{ n: number shown on the pins, name, work: {lat, lng}, home: {lat, lng} }]
 let lastPeople = null;
@@ -321,23 +336,29 @@ function renderResults(people, { scroll = false } = {}) {
     $('out').scrollIntoView({ block: 'start', behavior: reduceMotion() ? 'auto' : 'smooth' });
 }
 
-async function showResults(people, opts) {
+let lastRegion = 'quick'; // where results messages go: the quick form or the group screen
+async function showResults(people, opts = {}) {
+  const region = opts.region ?? lastRegion;
+  lastRegion = region;
   try {
     await graphReady;
+    $(`${region}-error`).textContent = '';
     renderResults(people, opts);
   } catch (err) {
     clearResults();
     if (err.message === 'unreachable') {
-      setStatus(
+      say(
+        region,
         err.who
           ? `We couldn't find public transport near ${err.who}'s address. Try a different postal code.`
           : "We couldn't find public transport near one of those addresses. Try a different postal code.",
         true,
       );
     } else if (!graph) {
-      setStatus('The transit data failed to load. Reload the page and try again.', true);
+      say(region, 'The transit data failed to load. Reload the page and try again.', true);
     } else {
-      throw err;
+      console.error(err);
+      say(region, 'Something went wrong working out the routes. Please try again.', true);
     }
   }
 }
@@ -357,6 +378,7 @@ const markBad = (inp) => {
 const clearBad = (inp) => {
   inp.classList.remove('bad');
   inp.removeAttribute('aria-invalid');
+  inp.removeAttribute('aria-describedby');
 };
 
 // Looks up one person's two postal codes once. The coordinates are saved with the entry,
@@ -369,7 +391,7 @@ async function lookupEntry({ name, work, home }) {
         return await geocode(inp.value.trim());
       } catch (err) {
         if (err.message === 'not found') markBad(inp);
-        throw err;
+        throw Object.assign(err, { fromGeocoder: true });
       }
     }),
   );
@@ -378,19 +400,24 @@ async function lookupEntry({ name, work, home }) {
 }
 
 // Turns any error into a short message, and outlines the field the server complained about.
-function explain(err, inputs = {}) {
+// `region` is where the message will be shown: outlined fields point to it for screen readers.
+function explain(err, inputs = {}, region = '') {
+  const describe = (inp) => region && inp.setAttribute('aria-describedby', `${region}-error`);
   if (err.message === 'not found') {
+    document.querySelectorAll('input.bad').forEach(describe);
     document.querySelector('input.bad')?.focus();
     return "We couldn't find a postal code. Check the boxes outlined in red.";
   }
   if (err.field && inputs[err.field]) {
     markBad(inputs[err.field]);
+    describe(inputs[err.field]);
     inputs[err.field].focus();
     return err.message;
   }
   if (err.status === 0) return "Couldn't reach the server. Check your connection and try again.";
   if (err.status) return err.message;
-  return 'OneMap is busy right now. Please try again in a few seconds.';
+  if (err.fromGeocoder) return 'OneMap is busy right now. Please try again in a few seconds.';
+  return 'Something went wrong. Please try again.';
 }
 
 const lookupInputs = (prefix) => ({
@@ -405,7 +432,7 @@ $('form').onsubmit = async (e) => {
   const go = $('go');
   go.disabled = true;
   go.textContent = 'Finding…';
-  setStatus('Looking up addresses…');
+  say('quick', 'Looking up addresses…');
   const rows = [...document.querySelectorAll('#people .person')];
   const inputs = rows.flatMap((r) => [...r.querySelectorAll('input')]);
   inputs.forEach(clearBad);
@@ -416,7 +443,7 @@ $('form').onsubmit = async (e) => {
           return await geocode(inp.value.trim());
         } catch (err) {
           if (err.message === 'not found') markBad(inp);
-          throw err;
+          throw Object.assign(err, { fromGeocoder: true });
         }
       }),
     );
@@ -426,10 +453,10 @@ $('form').onsubmit = async (e) => {
       work: pts[i * 2],
       home: pts[i * 2 + 1],
     }));
-    setStatus('Working out routes…');
-    await showResults(people, { scroll: true });
+    say('quick');
+    await showResults(people, { scroll: true, region: 'quick' });
   } catch (err) {
-    setStatus(explain(err), true);
+    say('quick', explain(err, {}, 'quick'), true);
   } finally {
     go.disabled = false;
     go.textContent = 'Find where to eat';
@@ -437,7 +464,18 @@ $('form').onsubmit = async (e) => {
 };
 
 // ---------- Views ----------
-const state = { id: null, data: null, editing: null, sig: '', timer: null };
+const state = { id: null, data: null, editing: null, sig: '', parts: {}, timer: null };
+
+// Private browsing and strict settings can block localStorage. Groups then keeps keys in memory.
+function storageWorks() {
+  try {
+    localStorage.setItem('wtea:probe', '1');
+    localStorage.removeItem('wtea:probe');
+    return true;
+  } catch {
+    return false;
+  }
+}
 const VIEWS = ['home', 'quick', 'group'];
 function showView(name) {
   for (const v of VIEWS) $(`view-${v}`).hidden = v !== name;
@@ -445,13 +483,14 @@ function showView(name) {
 
 $('quick-open').onclick = () => {
   showView('quick');
-  setStatus('');
+  clearMessages();
   document.querySelector('#people input')?.focus();
 };
 $('quick-close').onclick = () => {
   showView('home');
   clearResults();
-  setStatus('');
+  clearMessages();
+  $('home-h').focus();
 };
 
 const fmtDate = (iso) =>
@@ -477,6 +516,7 @@ function route() {
   clearResults();
   state.editing = null;
   state.sig = '';
+  state.parts = {};
   if (!parsed) {
     state.id = null;
     state.data = null;
@@ -494,12 +534,13 @@ function route() {
   state.data = null;
   showView('group');
   $('group-h').textContent = 'Loading group…';
+  $('group-h').focus();
   $('group-meta').textContent = '';
   $('members').replaceChildren();
   $('entry-form').hidden = true;
   $('join-open').hidden = true;
   $('owner-tools').hidden = true;
-  setStatus('');
+  clearMessages();
   loadGroup(true);
 }
 window.addEventListener('hashchange', route);
@@ -512,7 +553,8 @@ function groupExpired() {
   history.replaceState(null, '', location.pathname + location.search);
   clearResults();
   showView('home');
-  setStatus('That group has expired or no longer exists. You can start a new one.', true);
+  say('home', 'That group has expired or no longer exists. You can start a new one.', true);
+  $('home-h').focus();
 }
 
 async function loadGroup(initial = false) {
@@ -526,14 +568,23 @@ async function loadGroup(initial = false) {
   } catch (err) {
     if (id !== state.id) return;
     if (err.status === 404) return groupExpired();
-    setStatus(
-      initial
-        ? "We couldn't load this group. Check your connection and reload."
-        : "Couldn't refresh just now. We'll try again shortly.",
-      true,
-    );
+    if (initial) {
+      $('group-h').textContent = "Couldn't load this group";
+      $('group-retry').hidden = false;
+      say('group', "We couldn't load this group. Check your connection and try again.", true);
+      startPolling(); // and keep trying on its own
+    } else {
+      say('group', "Couldn't refresh just now. We'll try again shortly.", true);
+    }
   }
 }
+
+$('group-retry').onclick = () => {
+  $('group-retry').hidden = true;
+  $('group-h').textContent = 'Loading group…';
+  say('group');
+  loadGroup(true);
+};
 
 // ---------- Group screen ----------
 function renderGroup(data, initial) {
@@ -541,60 +592,78 @@ function renderGroup(data, initial) {
   const me = creds.memberId ? data.members.find((m) => m.id === creds.memberId) : null;
   const owner = Boolean(creds.ownerKey);
   state.data = data;
+  $('group-retry').hidden = true;
+  $('group-error').textContent = '';
 
   $('group-h').textContent = data.name;
   $('group-meta').textContent =
     `${data.members.length} of ${data.maxMembers} people. Deleted on ${fmtDate(data.expiresAt)} unless someone changes it.`;
 
+  // Rebuilding a part of the page drops keyboard focus and text selection inside it, so
+  // only do it when what it shows has changed.
   const list = $('members');
-  list.replaceChildren(
-    ...data.members.map((m) => {
-      const mine = me && m.id === me.id;
-      const acts = el('div', { className: 'acts' });
-      if (mine) {
-        const edit = el(
-          'button',
-          { type: 'button', className: 'act', 'aria-label': `Edit ${m.name}` },
-          'Edit',
+  patch('members', [data.members, me?.id, owner], () => {
+    list.replaceChildren(
+      ...data.members.map((m) => {
+        const mine = me && m.id === me.id;
+        const acts = el('div', { className: 'acts' });
+        if (mine) {
+          const edit = el(
+            'button',
+            { type: 'button', className: 'act', 'aria-label': `Edit ${m.name}` },
+            'Edit',
+          );
+          edit.onclick = () => startEntry(m);
+          acts.append(edit);
+        }
+        if (mine || owner) {
+          const rm = el(
+            'button',
+            { type: 'button', className: 'act', 'aria-label': `Remove ${m.name}` },
+            'Remove',
+          );
+          rm.onclick = () => removeEntry(m, mine);
+          acts.append(rm);
+        }
+        const nameLine = el('p', { className: 'who-line' }, el('strong', {}, m.name));
+        if (mine) nameLine.append(el('span', { className: 'tag' }, 'You'));
+        return el(
+          'li',
+          { className: 'member' },
+          el('span', { className: 'badge', 'aria-hidden': 'true' }, String(m.slot)),
+          el(
+            'div',
+            { className: 'info' },
+            nameLine,
+            el('p', { className: 'places' }, `Work ${m.work.postal} · Home ${m.home.postal}`),
+          ),
+          acts,
         );
-        edit.onclick = () => startEntry(m);
-        acts.append(edit);
-      }
-      if (mine || owner) {
-        const rm = el(
-          'button',
-          { type: 'button', className: 'act', 'aria-label': `Remove ${m.name}` },
-          'Remove',
-        );
-        rm.onclick = () => removeEntry(m, mine);
-        acts.append(rm);
-      }
-      const nameLine = el('p', { className: 'who-line' }, el('strong', {}, m.name));
-      if (mine) nameLine.append(el('span', { className: 'tag' }, 'You'));
-      return el(
-        'li',
-        { className: 'member' },
-        el('span', { className: 'badge', 'aria-hidden': 'true' }, String(m.slot)),
-        el(
-          'div',
-          { className: 'info' },
-          nameLine,
-          el('p', { className: 'places' }, `Work ${m.work.postal} · Home ${m.home.postal}`),
-        ),
-        acts,
-      );
-    }),
-  );
+      }),
+    );
+  });
 
   const full = data.members.length >= data.maxMembers;
   $('join-open').hidden = Boolean(me) || full || state.editing !== null;
-  if (!me && full && !state.editing) setStatus(`This group is full (${data.maxMembers} people).`);
+  if (!me && full && !state.editing)
+    say('group', `This group is full (${data.maxMembers} people).`);
   $('owner-tools').hidden = !owner;
   renderLinks(data.id, creds);
+  $('storage-warning').hidden = storageWorks();
+  if (state.justJoined && creds.memberKey) {
+    state.justJoined = false;
+    $('links').open = true;
+    say(
+      'group',
+      'Saved. Save this link to edit your entry later: it is the only way back in from another device.',
+    );
+    document.querySelector('#links-body input[aria-label="Your personal link"]')?.focus();
+  }
   if (initial && state.justCreated) {
     state.justCreated = false;
     $('links').open = true;
-    setStatus(
+    say(
+      'group',
       'Group created. Share the group link, and save your personal link to edit from another device.',
     );
   }
@@ -613,6 +682,14 @@ function renderGroup(data, initial) {
       { scroll: initial },
     );
   }
+}
+
+// Runs `build` only when `parts` differ from the last time this named part was built.
+function patch(name, parts, build) {
+  const sig = JSON.stringify(parts);
+  if (state.parts[name] === sig) return;
+  state.parts[name] = sig;
+  build();
 }
 
 function renderLinks(id, creds) {
@@ -668,7 +745,7 @@ function renderLinks(id, creds) {
         'Keep this private. It lets you remove entries and delete the group.',
       ),
     );
-  $('links-body').replaceChildren(...rows);
+  patch('links', urls, () => $('links-body').replaceChildren(...rows));
 }
 
 // ---------- Create, join, edit, remove ----------
@@ -679,7 +756,7 @@ $('create-form').onsubmit = async (e) => {
   const inputs = { groupName, ...lookupInputs('create') };
   go.disabled = true;
   go.textContent = 'Starting…';
-  setStatus('Looking up addresses…');
+  say('create', 'Looking up addresses…');
   try {
     const entry = await lookupEntry(lookupInputs('create'));
     const made = await Groups.request('POST', '', {
@@ -692,9 +769,10 @@ $('create-form').onsubmit = async (e) => {
     });
     state.justCreated = true;
     $('create-form').reset();
+    say('create');
     location.hash = `#g=${made.groupId}`;
   } catch (err) {
-    setStatus(explain(err, inputs), true);
+    say('create', explain(err, inputs, 'create'), true);
   } finally {
     go.disabled = false;
     go.textContent = 'Start group';
@@ -711,13 +789,19 @@ function startEntry(member = null) {
   $('entry-h').textContent = member ? 'Edit your details' : 'Add your details';
   $('entry-form').hidden = false;
   $('join-open').hidden = true;
-  setStatus('');
+  say('entry');
   f.name.focus();
 }
 function stopEntry() {
   state.editing = null;
   $('entry-form').hidden = true;
   if (state.data) renderGroup(state.data, false);
+  const target = $('join-open').hidden
+    ? [...document.querySelectorAll('#members .member button')].find((b) =>
+        b.getAttribute('aria-label')?.startsWith('Edit '),
+      )
+    : $('join-open');
+  (target || $('group-h')).focus();
 }
 $('join-open').onclick = () => startEntry();
 $('entry-cancel').onclick = stopEntry;
@@ -729,12 +813,14 @@ $('entry-form').onsubmit = async (e) => {
   const inputs = lookupInputs('entry');
   go.disabled = true;
   go.textContent = 'Saving…';
-  setStatus('Looking up addresses…');
+  say('entry', 'Looking up addresses…');
   try {
     const entry = await lookupEntry(inputs);
-    if (state.editing === 'new') {
+    const joining = state.editing === 'new';
+    if (joining) {
       const added = await Groups.request('POST', `/${id}/members`, { body: entry });
       Groups.save(id, { memberId: added.memberId, memberKey: added.memberKey });
+      state.justJoined = true;
     } else {
       const { memberKey } = Groups.creds(id);
       await Groups.request('PUT', `/${id}/members/${state.editing}`, {
@@ -744,11 +830,13 @@ $('entry-form').onsubmit = async (e) => {
     }
     state.editing = null;
     $('entry-form').hidden = true;
-    setStatus('Saved.');
+    say('entry');
+    say('group', 'Saved.');
     await loadGroup();
+    if (!joining) $('group-h').focus(); // a join focuses the personal link instead
   } catch (err) {
     if (err.status === 404) return groupExpired();
-    setStatus(explain(err, inputs), true);
+    say('entry', explain(err, inputs, 'entry'), true);
   } finally {
     go.disabled = false;
     go.textContent = 'Save';
@@ -765,11 +853,11 @@ async function removeEntry(member, mine) {
       key: mine ? creds.memberKey : creds.ownerKey,
     });
     if (mine) Groups.forget(id, 'memberId', 'memberKey');
-    setStatus('Removed.');
+    say('group', 'Removed.');
     await loadGroup();
   } catch (err) {
     if (err.status === 404) return groupExpired();
-    setStatus(explain(err), true);
+    say('group', explain(err, {}, 'group'), true);
   }
 }
 
@@ -784,10 +872,11 @@ $('delete-group').onclick = async () => {
     clearResults();
     history.replaceState(null, '', location.pathname + location.search);
     showView('home');
-    setStatus('Group deleted.');
+    say('home', 'Group deleted.');
+    $('home-h').focus();
   } catch (err) {
     if (err.status === 404) return groupExpired();
-    setStatus(explain(err), true);
+    say('group', explain(err, {}, 'group'), true);
   }
 };
 

@@ -1,3 +1,5 @@
+// Cap for the quick calculator only. It has no API to ask, so this number is kept by hand and
+// matches MAX_MEMBERS in server/config.js. The group screen reads maxMembers from GET /api/groups/:id.
 const MAX_PEOPLE = 10;
 const ONEMAP = 'https://www.onemap.gov.sg/api/common/elastic/search';
 const $ = (id) => document.getElementById(id);
@@ -94,48 +96,6 @@ async function geocode(postal) {
     geoCache.set(postal, pt);
     return pt;
   });
-}
-
-// Public-transport minutes over the graph. Detour = trip via the venue minus the direct work-to-home trip.
-const walkDirect = (a, b) => {
-  const d = Transit.distKm(a.lat, a.lng, b.lat, b.lng);
-  return d < 1.2 ? Transit.walkMin(d) : Infinity;
-};
-
-function score(people) {
-  const g = graph,
-    M = g.meta;
-  const places =
-    mode() === 'malls'
-      ? M.malls.filter((m) => m.access.length)
-      : M.stations.map((s) => ({ ...s, access: [[s.node, 0]] }));
-  const per = people.map((p) => {
-    const wa = g.access(p.work.lat, p.work.lng),
-      ha = g.access(p.home.lat, p.home.lng);
-    if (!wa.length || !ha.length) throw Object.assign(new Error('unreachable'), { who: p.name });
-    const fwd = g.search(wa, false),
-      rev = g.search(ha, true);
-    const direct = Math.min(g.reach(fwd, ha), walkDirect(p.work, p.home));
-    if (!Number.isFinite(direct)) throw Object.assign(new Error('unreachable'), { who: p.name });
-    return { fwd, rev, direct };
-  });
-  const out = [];
-  for (const s of places) {
-    const trips = [],
-      detours = [];
-    for (let i = 0; i < people.length; i++) {
-      const q = per[i];
-      const to = Math.min(g.reach(q.fwd, s.access), walkDirect(people[i].work, s));
-      const from = Math.min(g.reach(q.rev, s.access), walkDirect(s, people[i].home));
-      trips.push(to + from);
-      detours.push(Math.max(0, to + from - q.direct));
-    }
-    if (!trips.every(Number.isFinite)) continue;
-    const worst = Math.max(...detours);
-    out.push({ s, worst, detours, trip: Math.max(...trips), gap: worst - Math.min(...detours) });
-  }
-  if (!out.length) throw new Error('unreachable');
-  return out.sort((a, b) => a.worst - b.worst || a.trip - b.trip);
 }
 
 function personRow(i) {
@@ -246,7 +206,7 @@ function clearResults() {
 
 function renderResults(people, { scroll = false } = {}) {
   lastPeople = people;
-  const ranked = score(people);
+  const ranked = Ranking.rank({ graph, people, mode: mode() });
   const top = ranked.slice(0, 5);
   layer.clearLayers();
   picks = [];

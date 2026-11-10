@@ -1,7 +1,6 @@
 // Cap for the quick calculator only. It has no API to ask, so this number is kept by hand and
 // matches MAX_MEMBERS in server/config.js. The group screen reads maxMembers from GET /api/groups/:id.
 const MAX_PEOPLE = 10;
-const ONEMAP = 'https://www.onemap.gov.sg/api/common/elastic/search';
 const $ = (id) => document.getElementById(id);
 const esc = (s) =>
   String(s).replace(
@@ -46,57 +45,8 @@ const graphReady = Promise.all([
 });
 const mode = () => document.querySelector('input[name=mode]:checked').value;
 
-const geoCache = new Map();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-// Limit parallel lookups: OneMap answers 429 when calls arrive in a burst.
-let active = 0;
-const waiting = [];
-async function limited(fn) {
-  if (active >= 2) await new Promise((r) => waiting.push(r));
-  active++;
-  try {
-    return await fn();
-  } finally {
-    active--;
-    (waiting.shift() || (() => {}))();
-  }
-}
-
-async function fetchOnce(postal) {
-  const res = await fetch(`${ONEMAP}?searchVal=${postal}&returnGeom=Y&getAddrDetails=Y&pageNum=1`);
-  if (!res.ok) throw new Error('busy');
-  let data;
-  try {
-    data = await res.json();
-  } catch {
-    throw new Error('busy');
-  }
-  if (!Array.isArray(data.results)) throw new Error('busy');
-  return data.results[0];
-}
-
-async function geocode(postal) {
-  if (geoCache.has(postal)) return geoCache.get(postal);
-  return limited(async () => {
-    let hit, err;
-    for (let n = 0; n < 5; n++) {
-      try {
-        hit = await fetchOnce(postal);
-        err = null;
-        break;
-      } catch (e) {
-        err = e;
-        await sleep(300 * 2 ** n);
-      }
-    }
-    if (err) throw err;
-    if (!hit) throw new Error('not found');
-    const pt = { lat: +hit.LATITUDE, lng: +hit.LONGITUDE, label: hit.SEARCHVAL };
-    geoCache.set(postal, pt);
-    return pt;
-  });
-}
+const geocode = Geocode.createGeocoder({ fetch: (...args) => fetch(...args), sleep });
 
 function personRow(i) {
   const d = document.createElement('div');
@@ -196,8 +146,12 @@ function setStatus(text, isError = false) {
 // ---------- Results (shared by the quick calculator and groups) ----------
 // people: [{ n: number shown on the pins, name, work: {lat, lng}, home: {lat, lng} }]
 let lastPeople = null;
+// Advances whenever the screen changes. Async work takes a token before it awaits and
+// drops its result if the token is no longer current.
+const view = Groups.latest();
 
 function clearResults() {
+  view.invalidate(); // lookups still running must not draw here
   $('out').hidden = true;
   layer.clearLayers();
   picks = [];
@@ -282,10 +236,13 @@ function renderResults(people, { scroll = false } = {}) {
 }
 
 async function showResults(people, opts) {
+  const token = view.token();
   try {
     await graphReady;
+    if (!token.current()) return;
     renderResults(people, opts);
   } catch (err) {
+    if (!token.current()) return;
     clearResults();
     if (err.message === 'unreachable') {
       setStatus(
@@ -366,6 +323,7 @@ $('form').onsubmit = async (e) => {
   go.disabled = true;
   go.textContent = 'Finding…';
   setStatus('Looking up addresses…');
+  const token = view.token();
   const rows = [...document.querySelectorAll('#people .person')];
   const inputs = rows.flatMap((r) => [...r.querySelectorAll('input')]);
   inputs.forEach(clearBad);
@@ -380,6 +338,7 @@ $('form').onsubmit = async (e) => {
         }
       }),
     );
+    if (!token.current()) return;
     const people = rows.map((_, i) => ({
       n: i + 1,
       name: `Person ${i + 1}`,
@@ -389,7 +348,7 @@ $('form').onsubmit = async (e) => {
     setStatus('Working out routes…');
     await showResults(people, { scroll: true });
   } catch (err) {
-    setStatus(explain(err), true);
+    if (token.current()) setStatus(explain(err), true);
   } finally {
     go.disabled = false;
     go.textContent = 'Find where to eat';
@@ -434,6 +393,7 @@ document.addEventListener('visibilitychange', () => {
 function route() {
   const parsed = Groups.parseHash(location.hash);
   stopPolling();
+  loads.invalidate();
   clearResults();
   state.editing = null;
   state.sig = '';
@@ -475,12 +435,16 @@ function groupExpired() {
   setStatus('That group has expired or no longer exists. You can start a new one.', true);
 }
 
+// Polls, tab focus, saves and removes can all start a load. Only the newest one is rendered.
+const loads = Groups.latest();
 async function loadGroup(initial = false) {
   const id = state.id;
   if (!id) return;
   try {
-    const data = await Groups.request('GET', `/${id}`, { key: Groups.creds(id).memberKey });
-    if (id !== state.id) return;
+    const { stale, value: data } = await loads.run((signal) =>
+      Groups.request('GET', `/${id}`, { key: Groups.creds(id).memberKey, signal }),
+    );
+    if (stale || id !== state.id) return;
     renderGroup(data, initial);
     startPolling();
   } catch (err) {

@@ -29,6 +29,7 @@ export default [
         Transit: 'readonly', // set by transit.js
         Groups: 'readonly', // set by groups.js
         Ranking: 'readonly', // set by ranking.js
+        Geocode: 'readonly', // set by geocode.js
       },
     },
   },

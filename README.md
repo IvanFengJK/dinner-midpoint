@@ -92,15 +92,15 @@ Expired groups are never shown, even before the nightly clean-up removes them.
 
 ## Files
 
-| Path                                                                         | What it is                                                      |
-| ---------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `index.html`, `app.js`, `groups.js`, `ranking.js`, `transit.js`, `style.css` | the page                                                        |
-| `data/graph.*`                                                               | the transit graph the page loads                                |
-| `api/`                                                                       | Vercel Function entry points (thin wrappers)                    |
-| `server/`                                                                    | routing, validation, SQL, rate limiting                         |
-| `tests/`                                                                     | `npm test`                                                      |
-| `tools/`                                                                     | build, site check, local dev server                             |
-| `scripts/`, `data/*.json`                                                    | Python scripts and inputs that rebuild the graph (not deployed) |
+| Path                                                                                       | What it is                                                      |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| `index.html`, `app.js`, `groups.js`, `geocode.js`, `ranking.js`, `transit.js`, `style.css` | the page                                                        |
+| `data/graph.*`                                                                             | the transit graph the page loads                                |
+| `api/`                                                                                     | Vercel Function entry points (thin wrappers)                    |
+| `server/`                                                                                  | routing, validation, SQL, rate limiting                         |
+| `tests/`                                                                                   | `npm test`                                                      |
+| `tools/`                                                                                   | build, site check, local dev server                             |
+| `scripts/`, `data/*.json`                                                                  | Python scripts and inputs that rebuild the graph (not deployed) |
 
 ## Data
 

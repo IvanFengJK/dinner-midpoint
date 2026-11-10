@@ -1,8 +1,11 @@
 import { HttpError } from './http.js';
 import { hashKey, newGroupId, newKey, newMemberId } from './crypto.js';
-import { MAX_MEMBERS, RETENTION_DAYS } from './config.js';
+import { MAX_LIFETIME_DAYS, MAX_MEMBERS, RETENTION_DAYS } from './config.js';
 
 const EXPIRY = `now() + make_interval(days => ${RETENTION_DAYS})`;
+const LIVE = (a = '') =>
+  `${a}expires_at > now() AND ${a}created_at + make_interval(days => ${MAX_LIFETIME_DAYS}) > now()`;
+const CAPPED_EXPIRY = `LEAST(${EXPIRY}, created_at + make_interval(days => ${MAX_LIFETIME_DAYS}))`;
 const NOT_FOUND = () => new HttpError(404, 'This group has expired or does not exist.');
 const FORBIDDEN = () => new HttpError(403, 'You can’t change this.');
 
@@ -18,15 +21,13 @@ const memberParams = (m) => [
 
 async function touch(db, groupId) {
   await db.query(
-    `UPDATE groups SET last_edit = now(), expires_at = ${EXPIRY} WHERE id = $1::text`,
+    `UPDATE groups SET last_edit = now(), expires_at = ${CAPPED_EXPIRY} WHERE id = $1::text`,
     [groupId],
   );
 }
 
 async function groupIsLive(db, groupId) {
-  const rows = await db.query('SELECT 1 FROM groups WHERE id = $1::text AND expires_at > now()', [
-    groupId,
-  ]);
+  const rows = await db.query(`SELECT 1 FROM groups WHERE id = $1::text AND ${LIVE()}`, [groupId]);
   return rows.length > 0;
 }
 
@@ -57,7 +58,7 @@ const blur = (v) => Math.round(v * 200) / 200;
 
 export async function getGroup(db, groupId, memberKey = null) {
   const groups = await db.query(
-    'SELECT id, name, expires_at FROM groups WHERE id = $1::text AND expires_at > now()',
+    `SELECT id, name, expires_at FROM groups WHERE id = $1::text AND ${LIVE()}`,
     [groupId],
   );
   if (!groups.length) throw NOT_FOUND();
@@ -105,7 +106,7 @@ export async function addMember(db, groupId, member) {
            SELECT min(x) AS slot FROM generate_series(1, ${MAX_MEMBERS}) x
            WHERE x NOT IN (SELECT slot FROM members WHERE group_id = g.id)
          ) s
-         WHERE g.id = $2::text AND g.expires_at > now() AND s.slot IS NOT NULL
+         WHERE g.id = $2::text AND ${LIVE('g.')} AND s.slot IS NOT NULL
          RETURNING slot`,
         [memberId, groupId, ...memberParams(member), hashKey(memberKey)],
       );
@@ -128,7 +129,7 @@ export async function updateMember(db, groupId, memberId, key, member) {
             work_lng = $7::float8, home_postal = $8::text, home_lat = $9::float8,
             home_lng = $10::float8, updated_at = now()
      WHERE id = $1::text AND group_id = $2::text AND key_hash = $3::text
-       AND EXISTS (SELECT 1 FROM groups WHERE id = $2::text AND expires_at > now())
+       AND EXISTS (SELECT 1 FROM groups WHERE id = $2::text AND ${LIVE()})
      RETURNING id`,
     [memberId, groupId, hashKey(key), ...memberParams(member)],
   );
@@ -141,7 +142,7 @@ export async function removeMember(db, groupId, memberId, key) {
   const rows = await db.query(
     `DELETE FROM members m USING groups g
      WHERE m.id = $1::text AND m.group_id = $2::text AND g.id = m.group_id
-       AND g.expires_at > now() AND (m.key_hash = $3::text OR g.owner_hash = $3::text)
+       AND ${LIVE('g.')} AND (m.key_hash = $3::text OR g.owner_hash = $3::text)
      RETURNING m.id`,
     [memberId, groupId, hashKey(key)],
   );
@@ -151,7 +152,7 @@ export async function removeMember(db, groupId, memberId, key) {
 
 export async function deleteGroup(db, groupId, key) {
   const rows = await db.query(
-    `DELETE FROM groups WHERE id = $1::text AND owner_hash = $2::text AND expires_at > now()
+    `DELETE FROM groups WHERE id = $1::text AND owner_hash = $2::text AND ${LIVE()}
      RETURNING id`,
     [groupId, hashKey(key)],
   );
@@ -159,7 +160,7 @@ export async function deleteGroup(db, groupId, key) {
 }
 
 export async function cleanup(db) {
-  const groups = await db.query('DELETE FROM groups WHERE expires_at <= now() RETURNING id', []);
+  const groups = await db.query(`DELETE FROM groups WHERE NOT (${LIVE()}) RETURNING id`, []);
   const limits = await db.query(
     'DELETE FROM rate_limits WHERE expires_at <= now() RETURNING bucket',
     [],

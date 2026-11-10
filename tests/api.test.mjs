@@ -2,7 +2,10 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMemoryDb } from '../tools/memory-db.mjs';
 import { handle, handleCleanup } from '../server/app.js';
-import { MAX_MEMBERS } from '../server/config.js';
+import { MAX_MEMBERS, GROUP_WRITES_PER_HOUR } from '../server/config.js';
+
+// Production identifies visitors by the header Vercel's edge sets. Tests act as that edge.
+process.env.VERCEL = '1';
 
 let db;
 before(async () => {
@@ -13,7 +16,7 @@ after(() => db.close());
 let ipCounter = 0;
 async function call(method, path, { body, key, ip, headers = {} } = {}) {
   const h = {
-    'x-forwarded-for': ip ?? `10.0.${Math.floor(++ipCounter / 250)}.${ipCounter % 250}`,
+    'x-vercel-forwarded-for': ip ?? `10.0.${Math.floor(++ipCounter / 250)}.${ipCounter % 250}`,
     ...headers,
   };
   if (body !== undefined) h['content-type'] = 'application/json';
@@ -226,6 +229,193 @@ test('the database stores only hashes of the keys', async () => {
   assert.notEqual(rows[0].owner_hash, g.ownerKey);
   assert.notEqual(rows[0].key_hash, g.memberKey);
   assert.match(rows[0].owner_hash, /^[0-9a-f]{64}$/);
+});
+
+test('a group accepts a limited number of writes per hour, from any visitor', async () => {
+  const g = (await create()).body;
+  const other = (await create()).body;
+  const path = `/api/groups/${g.groupId}/members`;
+  const bob = (await call('POST', path, { body: entry('Bob') })).body;
+  const edit = () =>
+    call('PUT', `${path}/${bob.memberId}`, { key: bob.memberKey, body: entry('Bobby') });
+  // The add above was write 1; every call uses a new visitor, so only the group cap can stop them.
+  for (let i = 2; i <= GROUP_WRITES_PER_HOUR; i++) assert.equal((await edit()).status, 200);
+  const over = await edit();
+  assert.equal(over.status, 429);
+  assert.equal(
+    (await call('GET', `/api/groups/${g.groupId}`)).status,
+    200,
+    'reads are not counted',
+  );
+  assert.equal(
+    (await call('POST', `/api/groups/${other.groupId}/members`, { body: entry() })).status,
+    201,
+  );
+});
+
+test('editing late in a group’s life never pushes expiry past 30 days from creation', async () => {
+  const g = (await create()).body;
+  await db.query(
+    "UPDATE groups SET created_at = now() - interval '29 days', expires_at = now() + interval '1 hour' WHERE id = $1",
+    [g.groupId],
+  );
+  await call('POST', `/api/groups/${g.groupId}/members`, { body: entry('Bob') });
+  const [row] = await db.query(
+    "SELECT expires_at <= created_at + interval '30 days' AS capped, expires_at > now() + interval '23 hours' AS extended FROM groups WHERE id = $1",
+    [g.groupId],
+  );
+  assert.equal(row.capped, true);
+  assert.equal(row.extended, true, 'still pushed forward, up to the cap');
+});
+
+test('a group older than 30 days is gone and the clean-up removes it, however much it was edited', async () => {
+  const g = (await create()).body;
+  await db.query(
+    "UPDATE groups SET created_at = now() - interval '31 days', expires_at = now() + interval '5 days' WHERE id = $1",
+    [g.groupId],
+  );
+  assert.equal((await call('GET', `/api/groups/${g.groupId}`)).status, 404);
+  const join = await call('POST', `/api/groups/${g.groupId}/members`, { body: entry('Bob') });
+  assert.equal(join.status, 404);
+  process.env.CRON_SECRET = 'cron-secret';
+  const res = await handleCleanup(
+    new Request('http://localhost/api/cron/cleanup', {
+      headers: { authorization: 'Bearer cron-secret' },
+    }),
+    { db },
+  );
+  assert.equal(res.status, 200);
+  const rows = await db.query('SELECT 1 FROM groups WHERE id = $1', [g.groupId]);
+  assert.equal(rows.length, 0);
+});
+
+// Sends group-creation requests with exactly the given headers; returns the status codes.
+async function createMany(n, headersFor) {
+  const codes = [];
+  for (let i = 0; i < n; i++) {
+    const res = await handle(
+      new Request('http://localhost/api/groups', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...headersFor(i) },
+        body: JSON.stringify({ groupName: 'G', ...entry() }),
+      }),
+      { db },
+    );
+    codes.push(res.status);
+  }
+  return codes;
+}
+
+test('on Vercel the visitor is the edge-set address; a spoofed X-Forwarded-For buys nothing', async () => {
+  const codes = await createMany(12, (i) => ({
+    'x-vercel-forwarded-for': '198.51.100.7, 10.0.0.1',
+    'x-forwarded-for': `203.0.113.${i}`,
+  }));
+  assert.deepEqual(codes.slice(10), [429, 429]);
+});
+
+test('off Vercel, forwarded headers are ignored, so spoofing cannot buy extra requests', async () => {
+  delete process.env.VERCEL;
+  try {
+    const codes = await createMany(12, (i) => ({
+      'x-forwarded-for': `203.0.114.${i}`,
+      'x-real-ip': `203.0.115.${i}`,
+      'x-vercel-forwarded-for': `203.0.116.${i}`,
+    }));
+    assert.deepEqual(codes.slice(10), [429, 429]);
+  } finally {
+    process.env.VERCEL = '1';
+  }
+});
+
+test('the clean-up accepts only the exact cron secret, whatever the length of a wrong one', async () => {
+  process.env.CRON_SECRET = 'cron-secret';
+  const run = async (authorization) =>
+    (
+      await handleCleanup(
+        new Request('http://localhost/api/cron/cleanup', {
+          headers: authorization === undefined ? {} : { authorization },
+        }),
+        { db },
+      )
+    ).status;
+  assert.equal(await run(undefined), 401);
+  assert.equal(await run('Bearer '), 401);
+  assert.equal(await run('Bearer cron-secre'), 401);
+  assert.equal(await run('Bearer cron-secret-and-much-more' + 'x'.repeat(5000)), 401);
+  assert.equal(await run('cron-secret'), 401);
+  assert.equal(await run('Bearer cron-secret'), 200);
+});
+
+test('rate-limit counts are keyed by RATE_LIMIT_SALT, so a new salt starts a fresh count', async () => {
+  const headers = () => ({ 'x-vercel-forwarded-for': '198.51.100.99' });
+  const before = process.env.RATE_LIMIT_SALT;
+  process.env.RATE_LIMIT_SALT = 'salt-one';
+  try {
+    const first = await createMany(11, headers);
+    assert.equal(first[10], 429);
+    process.env.RATE_LIMIT_SALT = 'salt-two';
+    assert.deepEqual(await createMany(1, headers), [201]);
+  } finally {
+    if (before === undefined) delete process.env.RATE_LIMIT_SALT;
+    else process.env.RATE_LIMIT_SALT = before;
+  }
+});
+
+const post = (body, headers = {}, init = {}) =>
+  handle(
+    new Request('http://localhost/api/groups', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-vercel-forwarded-for': '192.0.2.50',
+        ...headers,
+      },
+      body,
+      ...init,
+    }),
+    { db },
+  );
+
+test('body size is counted in bytes: 1500 euro signs is 4500 bytes and is refused', async () => {
+  const body = JSON.stringify({ groupName: '€'.repeat(1500), ...entry() });
+  const res = await post(body, { 'content-length': String(new TextEncoder().encode(body).length) });
+  assert.equal(res.status, 413);
+  assert.equal((await post(body)).status, 413, 'also when no content-length is sent');
+});
+
+test('an oversized content-length is refused without reading the body', async () => {
+  let pulled = 0;
+  const stream = new ReadableStream(
+    {
+      pull(controller) {
+        pulled++;
+        if (pulled > 3) return controller.close();
+        controller.enqueue(new TextEncoder().encode('x'.repeat(1000)));
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  const res = await post(stream, { 'content-length': '1000000' }, { duplex: 'half' });
+  assert.equal(res.status, 413);
+  assert.equal(pulled, 0);
+});
+
+test('without content-length the body is read only up to the cap', async () => {
+  let pulled = 0;
+  const stream = new ReadableStream(
+    {
+      pull(controller) {
+        pulled++;
+        if (pulled > 1000) return controller.close();
+        controller.enqueue(new TextEncoder().encode('x'.repeat(1000)));
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  const res = await post(stream, {}, { duplex: 'half' });
+  assert.equal(res.status, 413);
+  assert.ok(pulled <= 6, `read ${pulled} chunks of 1000 bytes`);
 });
 
 // ---- Other members' homes are blurred (issue #3) ----

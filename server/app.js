@@ -1,9 +1,10 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { HttpError, json, readJson } from './http.js';
 import { GROUP_ID_RE, KEY_RE, MEMBER_ID_RE } from './crypto.js';
 import { cleanGroupCreate, cleanMember } from './validate.js';
 import { ensureSchema } from './schema.js';
-import { limit } from './ratelimit.js';
-import { LIMITS } from './config.js';
+import { limit, limitGroup } from './ratelimit.js';
+import { LIMITS, GROUP_WRITES_PER_HOUR } from './config.js';
 import { getDb } from './db.js';
 import * as store from './store.js';
 
@@ -66,6 +67,7 @@ async function dispatch(request, db) {
     return json(200, await store.getGroup(db, route.groupId, KEY_RE.test(key) ? key : null));
   }
   await limit(db, request, 'write', LIMITS.write);
+  await limitGroup(db, route.groupId, GROUP_WRITES_PER_HOUR);
   if (route.name === 'group') {
     await store.deleteGroup(db, route.groupId, secret(request));
     return json(200, { ok: true });
@@ -105,11 +107,18 @@ export async function handle(request, deps = {}) {
   }
 }
 
+// Compares digests, so the comparison takes the same time whatever the lengths or contents.
+const digest = (value) => createHash('sha256').update(value).digest();
+const sameSecret = (a, b) => timingSafeEqual(digest(a), digest(b));
+
 // Daily clean-up of expired groups. Vercel Cron sends `Authorization: Bearer $CRON_SECRET`.
 export async function handleCleanup(request, deps = {}) {
   try {
     const expected = process.env.CRON_SECRET;
-    if (!expected || request.headers.get('authorization') !== `Bearer ${expected}`) {
+    if (
+      !expected ||
+      !sameSecret(request.headers.get('authorization') || '', `Bearer ${expected}`)
+    ) {
       throw new HttpError(401, 'Unauthorized.');
     }
     const db = deps.db ?? getDb();

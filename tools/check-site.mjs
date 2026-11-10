@@ -30,7 +30,8 @@ for (const f of PUBLISHED_FILES) if (!files.includes(f)) fail(`missing from arti
 // 2. Size budget.
 let total = 0;
 for (const f of files) total += (await stat(join(root, f))).size;
-if (total > MAX_BYTES) fail(`artifact is ${(total / 1e6).toFixed(1)} MB, over the ${MAX_BYTES / 1e6} MB budget`);
+if (total > MAX_BYTES)
+  fail(`artifact is ${(total / 1e6).toFixed(1)} MB, over the ${MAX_BYTES / 1e6} MB budget`);
 
 // 3. No secrets in text files.
 const TEXT = /\.(html|js|css|json|svg|txt|md)$/;
@@ -78,4 +79,6 @@ if (errors.length) {
   for (const e of errors) console.error(`  - ${e}`);
   process.exit(1);
 }
-console.log(`check-site: OK (${files.length} files, ${(total / 1e6).toFixed(2)} MB, ${refs.length} references resolved)`);
+console.log(
+  `check-site: OK (${files.length} files, ${(total / 1e6).toFixed(2)} MB, ${refs.length} references resolved)`,
+);

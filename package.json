@@ -3,7 +3,9 @@
   "private": true,
   "description": "Static site. Dev tooling only: nothing here is shipped to the browser.",
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "lint": "npm run lint:js && npm run lint:css && npm run lint:html",
     "lint:js": "eslint .",

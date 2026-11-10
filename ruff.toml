@@ -11,3 +11,9 @@ select = ["E9", "F", "B", "S"]
 ignore = [
   "S311", # random is used for sampling in calibration, not for anything security-related
 ]
+
+[lint.per-file-ignores]
+# S310 warns about file:/custom URL schemes in urlopen. These two scripts only call
+# the hard-coded https OneMap endpoint, so the warning does not apply.
+"scripts/calibrate.py" = ["S310"]
+"scripts/validate_addresses.py" = ["S310"]

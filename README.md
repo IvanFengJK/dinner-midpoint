@@ -8,7 +8,8 @@ Two ways to use it:
 
 - **Groups.** One person starts a group and shares the link. Each person adds their own name,
   work and home postal code, and can edit or remove only their own entry. Up to 10 people. Groups
-  delete themselves 7 days after the last change.
+  delete themselves 7 days after the last change, and never later than 30 days after they were
+  created, however often they are edited. Each group accepts at most 120 changes per hour.
 - **Quick calculator.** Type everyone in yourself. Nothing is saved.
 
 ## Versions
@@ -67,7 +68,14 @@ These steps need your accounts, so they are done by hand:
 3. **Add a cron secret.** In Settings, Environment Variables, add `CRON_SECRET` with a long random
    value (for example `openssl rand -hex 32`). Vercel sends it with the nightly clean-up call, and
    the clean-up refuses requests without it.
-4. **Deploy.** Push the branch. Every branch gets its own preview URL.
+4. **Add a rate-limit salt.** Add `RATE_LIMIT_SALT` with a long random value (for example
+   `openssl rand -hex 32`). Visitor addresses are stored only as an HMAC keyed with it. Until it
+   is set, the server falls back to a salt derived from `DATABASE_URL` and logs a warning.
+5. **Deploy.** Push the branch. Every branch gets its own preview URL.
+
+Environment variables: `DATABASE_URL` (set by Neon), `CRON_SECRET` and `RATE_LIMIT_SALT`. The rate
+limiter trusts only the `x-vercel-forwarded-for` header, which Vercel sets. Anywhere else all
+visitors share one limit, so do not host this server elsewhere without a trusted proxy header.
 
 Expired groups are never shown, even before the nightly clean-up removes them.
 

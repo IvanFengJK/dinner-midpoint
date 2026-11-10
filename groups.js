@@ -63,7 +63,7 @@
     writeAll(all);
   }
 
-  async function request(method, path, { body, key } = {}) {
+  async function request(method, path, { body, key, signal } = {}) {
     const headers = {};
     if (body !== undefined) headers['content-type'] = 'application/json';
     if (key) headers['x-key'] = key;
@@ -73,6 +73,7 @@
         method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
+        signal,
       });
     } catch {
       throw Object.assign(new Error('network'), { status: 0 });
@@ -92,7 +93,36 @@
     return data;
   }
 
-  const api = { parseHash, links, creds, save, forget, request };
+  // "Newest wins": only the most recent run() is accepted; older ones come back stale.
+  function latest() {
+    let seq = 0;
+    let ctrl = null;
+    return {
+      invalidate() {
+        seq++;
+        ctrl?.abort();
+      },
+      // For code that awaits several things: take a token first, check current() after each await.
+      token() {
+        const mine = ++seq;
+        return { current: () => mine === seq };
+      },
+      async run(work) {
+        const mine = ++seq;
+        ctrl?.abort();
+        ctrl = new AbortController();
+        try {
+          const value = await work(ctrl.signal);
+          return mine === seq ? { stale: false, value } : { stale: true };
+        } catch (err) {
+          if (mine === seq) throw err;
+          return { stale: true };
+        }
+      },
+    };
+  }
+
+  const api = { parseHash, links, creds, save, forget, request, latest };
   if (typeof module !== 'undefined') module.exports = api;
   else root.Groups = api;
 })(typeof window !== 'undefined' ? window : globalThis);

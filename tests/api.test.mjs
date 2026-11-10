@@ -227,3 +227,78 @@ test('the database stores only hashes of the keys', async () => {
   assert.notEqual(rows[0].key_hash, g.memberKey);
   assert.match(rows[0].owner_hash, /^[0-9a-f]{64}$/);
 });
+
+// ---- Other members' homes are blurred (issue #3) ----
+// Rule: home coordinates for everyone but the caller are rounded to the nearest 0.005 degree
+// (Math.round, so exact halves go up); the home postal code is left out. Work stays exact.
+const exactHome = { postal: '558762', lat: 1.3612, lng: 103.8648 };
+const detailed = (name) => ({
+  name,
+  work: place('238801', 1.30123, 103.80456),
+  home: exactHome,
+});
+async function twoMembers() {
+  const g = (await create(detailed('Ann'))).body;
+  const bob = (await call('POST', `/api/groups/${g.groupId}/members`, { body: detailed('Bob') }))
+    .body;
+  return { g, bob, url: `/api/groups/${g.groupId}` };
+}
+
+test('without a key every home is blurred and nothing is flagged mine', async () => {
+  const { url } = await twoMembers();
+  const { status, body } = await call('GET', url);
+  assert.equal(status, 200);
+  for (const m of body.members) {
+    assert.equal(m.home.postal, undefined);
+    assert.equal(m.home.lat, 1.36);
+    assert.equal(m.home.lng, 103.865);
+    assert.equal(m.mine, undefined);
+    assert.deepEqual(m.work, { postal: '238801', lat: 1.30123, lng: 103.80456 });
+  }
+});
+
+test('a member key returns that entry exact and flagged mine, and others blurred', async () => {
+  const { bob, url } = await twoMembers();
+  const { status, body } = await call('GET', url, { key: bob.memberKey });
+  assert.equal(status, 200);
+  const [ann, me] = body.members;
+  assert.equal(me.mine, true);
+  assert.deepEqual(me.home, exactHome);
+  assert.equal(ann.mine, undefined);
+  assert.deepEqual(ann.home, { lat: 1.36, lng: 103.865 });
+});
+
+test('the owner key does not unblur anyone, and a wrong or malformed key is treated as no key', async () => {
+  const { g, url } = await twoMembers();
+  const anon = await call('GET', url);
+  for (const key of [g.ownerKey, 'x'.repeat(22), 'short', 'bad key!!']) {
+    const got = await call('GET', url, { key });
+    assert.equal(got.status, 200, `key ${key}`);
+    assert.deepEqual(got.body, anon.body, `key ${key}`);
+  }
+});
+
+test('responses never carry key hashes, and stored homes stay exact for their owner', async () => {
+  const { g, bob, url } = await twoMembers();
+  const text = JSON.stringify((await call('GET', url, { key: bob.memberKey })).body);
+  assert.ok(!/hash/i.test(text) && !/key/i.test(text));
+  // Blurred reads change nothing in storage: each owner still reads back the exact values.
+  assert.deepEqual((await call('GET', url, { key: g.memberKey })).body.members[0].home, exactHome);
+  assert.deepEqual(
+    (await call('GET', url, { key: bob.memberKey })).body.members[1].home,
+    exactHome,
+  );
+});
+
+test('home coordinates round to the nearest 0.005, consistently around a grid boundary', async () => {
+  const at = (lat, lng) => ({ ...detailed('Z'), home: { postal: '558762', lat, lng } });
+  const g = (await create(at(1.36249, 103.86251))).body;
+  await call('POST', `/api/groups/${g.groupId}/members`, { body: at(1.36251, 103.86249) });
+  await call('POST', `/api/groups/${g.groupId}/members`, { body: at(1.15, 104.1) });
+  const homes = (await call('GET', `/api/groups/${g.groupId}`)).body.members.map((m) => m.home);
+  assert.deepEqual(homes, [
+    { lat: 1.36, lng: 103.865 },
+    { lat: 1.365, lng: 103.86 },
+    { lat: 1.15, lng: 104.1 },
+  ]);
+});

@@ -61,7 +61,9 @@ async function dispatch(request, db) {
   }
   if (route.name === 'group' && method === 'GET') {
     await limit(db, request, 'read', LIMITS.read);
-    return json(200, await store.getGroup(db, route.groupId));
+    // The key is optional here: a missing or malformed one just means every home is blurred.
+    const key = request.headers.get('x-key') || '';
+    return json(200, await store.getGroup(db, route.groupId, KEY_RE.test(key) ? key : null));
   }
   await limit(db, request, 'write', LIMITS.write);
   if (route.name === 'group') {

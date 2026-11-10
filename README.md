@@ -39,8 +39,12 @@ Two ways to use it:
 | Owner link `#g=<id>&o=<key>`             | the owner key             | remove any entry, delete the group |
 
 The keys sit after the `#`, which browsers never send to servers or in referrer headers. Only
-SHA-256 hashes of the keys are stored. Anyone holding a group link can see every name and postal
-code in that group, so the page says so.
+SHA-256 hashes of the keys are stored. Anyone holding a group link can see every name and work
+postal code in that group, so the page says so. Home is private: the API returns another person's
+home only as coordinates rounded to a 0.005-degree grid (about 550 m) with no postal code. The
+browser sends your personal key (`x-key`) on every group read, and only then is your own entry
+returned in full (`mine: true`). The owner key does not reveal anyone's home. Rankings and map pins
+for other people use the blurred position, so results can shift slightly.
 
 ## Run it locally
 
